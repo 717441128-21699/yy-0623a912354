@@ -1,54 +1,240 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
-import { WrongRecord, TrainingStats, WeaknessCategory, CaseData } from '@/types'
+import Taro from '@tarojs/taro'
+import { WrongRecord, TrainingStats, WeaknessCategory, CaseData, CaseCategory } from '@/types'
 import { mockCases } from '@/data/cases'
 import { calcWeaknessDistribution } from '@/utils'
+
+export interface MockStudent {
+  id: string
+  name: string
+  avatar: string
+  title: string
+  completedCaseIds: string[]
+  wrongRecords: WrongRecord[]
+}
 
 interface TrainingContextType {
   wrongRecords: WrongRecord[]
   completedCaseIds: string[]
   currentCaseId: string | null
+  wrongCount: number
+  currentStudentId: string
+  isTeacherMode: boolean
+  mockStudents: MockStudent[]
   addWrongRecord: (record: WrongRecord) => void
   setCaseCompleted: (caseId: string) => void
   setCurrentCase: (caseId: string) => void
   clearAllData: () => void
   getStats: () => TrainingStats
-  getCasesByCategory: (category: CaseData['category']) => CaseData[]
+  getStatsByStudent: (studentId: string) => TrainingStats
+  getCasesByCategory: (category: CaseCategory) => CaseData[]
   getWrongRecordsByCategory: (category: WeaknessCategory) => WrongRecord[]
+  getWrongRecordsByStudent: (studentId: string) => WrongRecord[]
+  switchStudent: (studentId: string) => void
+  toggleTeacherMode: () => void
 }
 
 const TrainingContext = createContext<TrainingContextType | null>(null)
 
-const STORAGE_KEY_WRONG = 'dental_qc_wrong_records'
-const STORAGE_KEY_COMPLETED = 'dental_qc_completed_cases'
+const STORAGE_KEY_WRONG = 'dental_qc_wrong_records_v2'
+const STORAGE_KEY_COMPLETED = 'dental_qc_completed_cases_v2'
+const STORAGE_KEY_MODE = 'dental_qc_mode'
+const STORAGE_KEY_STUDENT = 'dental_qc_current_student'
+const STORAGE_KEY_STUDENTS = 'dental_qc_students_v2'
+
+const generateMockWrongRecords = (seed: number): WrongRecord[] => {
+  const items: Array<{
+    caseId: string
+    caseTitle: string
+    category: CaseCategory
+    auditItemKey: import('@/types').AuditItemKey
+    auditItemLabel: string
+    weaknessCategory: WeaknessCategory
+    analysis: import('@/types').AuditItem['analysis']
+    userAnswer: boolean
+  }> = []
+
+  mockCases.forEach(c => {
+    c.auditItems.forEach(item => {
+      if (!item.isCompliant) {
+        items.push({
+          caseId: c.id,
+          caseTitle: c.title,
+          category: c.category,
+          auditItemKey: item.key,
+          auditItemLabel: item.label,
+          weaknessCategory: item.weaknessCategory,
+          analysis: item.analysis,
+          userAnswer: true
+        })
+      }
+    })
+  })
+
+  const shuffled = items.sort(() => Math.sin(seed) - 0.5 + (Math.random() - 0.5))
+  const count = Math.min(shuffled.length, 4 + (seed % 8))
+  const selected = shuffled.slice(0, count)
+
+  return selected.map((it, idx) => ({
+    id: `mock-${seed}-${idx}`,
+    ...it,
+    correctAnswer: false,
+    timestamp: Date.now() - (idx + 1) * 3600_000
+  }))
+}
+
+const defaultMockStudents: MockStudent[] = [
+  {
+    id: 'stu-001',
+    name: '张思远',
+    avatar: '👨‍⚕️',
+    title: '规培第一年',
+    completedCaseIds: ['implant-001', 'orthodontic-001', 'endodontic-001'],
+    wrongRecords: generateMockWrongRecords(1)
+  },
+  {
+    id: 'stu-002',
+    name: '李雨桐',
+    avatar: '👩‍⚕️',
+    title: '新入职3个月',
+    completedCaseIds: ['implant-001', 'implant-002', 'endodontic-001'],
+    wrongRecords: generateMockWrongRecords(2)
+  },
+  {
+    id: 'stu-003',
+    name: '王浩然',
+    avatar: '🧑‍⚕️',
+    title: '口腔医学生·大五',
+    completedCaseIds: ['orthodontic-001', 'endodontic-001'],
+    wrongRecords: generateMockWrongRecords(3)
+  },
+  {
+    id: 'stu-004',
+    name: '陈佳琪',
+    avatar: '👩‍🎓',
+    title: '规培第二年',
+    completedCaseIds: ['implant-001', 'implant-002', 'orthodontic-001', 'orthodontic-002', 'endodontic-001', 'endodontic-002'],
+    wrongRecords: generateMockWrongRecords(4)
+  }
+]
+
+const loadStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    if (process.env.TARO_ENV === 'h5') {
+      const raw = localStorage.getItem(key)
+      return raw ? JSON.parse(raw) : fallback
+    } else {
+      const raw = Taro.getStorageSync(key)
+      return raw !== '' && raw !== undefined && raw !== null ? JSON.parse(raw) : fallback
+    }
+  } catch (e) {
+    console.warn(`[Storage] load ${key} failed:`, e)
+    return fallback
+  }
+}
+
+const saveStorage = (key: string, value: unknown) => {
+  try {
+    const str = JSON.stringify(value)
+    if (process.env.TARO_ENV === 'h5') {
+      localStorage.setItem(key, str)
+    } else {
+      Taro.setStorageSync(key, str)
+    }
+  } catch (e) {
+    console.warn(`[Storage] save ${key} failed:`, e)
+  }
+}
+
+const removeStorage = (key: string) => {
+  try {
+    if (process.env.TARO_ENV === 'h5') {
+      localStorage.removeItem(key)
+    } else {
+      Taro.removeStorageSync(key)
+    }
+  } catch (e) {
+    console.warn(`[Storage] remove ${key} failed:`, e)
+  }
+}
 
 export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [wrongRecords, setWrongRecords] = useState<WrongRecord[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_WRONG)
-      return raw ? JSON.parse(raw) : []
-    } catch {
-      return []
-    }
-  })
+  const [wrongRecords, setWrongRecords] = useState<WrongRecord[]>(() =>
+    loadStorage<WrongRecord[]>(STORAGE_KEY_WRONG, [])
+  )
 
-  const [completedCaseIds, setCompletedCaseIds] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_COMPLETED)
-      return raw ? JSON.parse(raw) : []
-    } catch {
-      return []
-    }
-  })
+  const [completedCaseIds, setCompletedCaseIds] = useState<string[]>(() =>
+    loadStorage<string[]>(STORAGE_KEY_COMPLETED, [])
+  )
+
+  const [mockStudents, setMockStudents] = useState<MockStudent[]>(() =>
+    loadStorage<MockStudent[]>(STORAGE_KEY_STUDENTS, defaultMockStudents)
+  )
 
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null)
 
+  const [isTeacherMode, setIsTeacherMode] = useState<boolean>(() =>
+    loadStorage<boolean>(STORAGE_KEY_MODE, false)
+  )
+
+  const [currentStudentId, setCurrentStudentId] = useState<string>(() =>
+    loadStorage<string>(STORAGE_KEY_STUDENT, 'self')
+  )
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_WRONG, JSON.stringify(wrongRecords))
+    saveStorage(STORAGE_KEY_WRONG, wrongRecords)
   }, [wrongRecords])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify(completedCaseIds))
+    saveStorage(STORAGE_KEY_COMPLETED, completedCaseIds)
   }, [completedCaseIds])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_STUDENTS, mockStudents)
+  }, [mockStudents])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_MODE, isTeacherMode)
+  }, [isTeacherMode])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_STUDENT, currentStudentId)
+  }, [currentStudentId])
+
+  const computeStats = useCallback((wrongs: WrongRecord[], completed: string[]): TrainingStats => {
+    const totalCases = mockCases.length
+    const completedCases = completed.length
+    const answeredItems = completedCases * 5
+    const wrongCount = wrongs.length
+    const correctCount = Math.max(0, answeredItems - wrongCount)
+    const correctRate = answeredItems > 0
+      ? Math.round((correctCount / answeredItems) * 100)
+      : 0
+    const weaknessDistribution = calcWeaknessDistribution(wrongs)
+
+    return {
+      totalCases,
+      completedCases,
+      correctRate,
+      wrongCount,
+      weaknessDistribution
+    }
+  }, [])
+
+  const getStats = useCallback((): TrainingStats => {
+    return computeStats(wrongRecords, completedCaseIds)
+  }, [wrongRecords, completedCaseIds, computeStats])
+
+  const getStatsByStudent = useCallback((studentId: string): TrainingStats => {
+    if (studentId === 'self') {
+      return computeStats(wrongRecords, completedCaseIds)
+    }
+    const stu = mockStudents.find(s => s.id === studentId)
+    if (!stu) {
+      return computeStats([], [])
+    }
+    return computeStats(stu.wrongRecords, stu.completedCaseIds)
+  }, [wrongRecords, completedCaseIds, mockStudents, computeStats])
 
   const addWrongRecord = useCallback((record: WrongRecord) => {
     setWrongRecords(prev => {
@@ -74,31 +260,11 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearAllData = useCallback(() => {
     setWrongRecords([])
     setCompletedCaseIds([])
+    removeStorage(STORAGE_KEY_WRONG)
+    removeStorage(STORAGE_KEY_COMPLETED)
   }, [])
 
-  const getStats = useCallback((): TrainingStats => {
-    const totalCases = mockCases.length
-    const completedCases = completedCaseIds.length
-    const totalAuditItems = mockCases.reduce(
-      (sum, c) => sum + c.auditItems.length, 0
-    )
-    const wrongCount = wrongRecords.length
-    const correctRate = totalAuditItems > 0
-      ? Math.max(0, Math.round(((totalAuditItems * completedCases / mockCases.length) - wrongCount) / (totalAuditItems * completedCases / mockCases.length || 1) * 100))
-      : 0
-
-    const weaknessDistribution = calcWeaknessDistribution(wrongRecords)
-
-    return {
-      totalCases,
-      completedCases,
-      correctRate: completedCases === 0 ? 0 : correctRate,
-      wrongCount,
-      weaknessDistribution
-    }
-  }, [completedCaseIds, wrongRecords])
-
-  const getCasesByCategory = useCallback((category: CaseData['category']) => {
+  const getCasesByCategory = useCallback((category: CaseCategory) => {
     return mockCases.filter(c => c.category === category)
   }, [])
 
@@ -106,19 +272,47 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
     return wrongRecords.filter(r => r.weaknessCategory === category)
   }, [wrongRecords])
 
+  const getWrongRecordsByStudent = useCallback((studentId: string) => {
+    if (studentId === 'self') return wrongRecords
+    const stu = mockStudents.find(s => s.id === studentId)
+    return stu ? stu.wrongRecords : []
+  }, [wrongRecords, mockStudents])
+
+  const switchStudent = useCallback((studentId: string) => {
+    setCurrentStudentId(studentId)
+  }, [])
+
+  const toggleTeacherMode = useCallback(() => {
+    setIsTeacherMode(prev => {
+      const next = !prev
+      if (next && currentStudentId === 'self' && mockStudents.length > 0) {
+        setCurrentStudentId(mockStudents[0].id)
+      }
+      return next
+    })
+  }, [currentStudentId, mockStudents])
+
   return (
     <TrainingContext.Provider
       value={{
         wrongRecords,
         completedCaseIds,
         currentCaseId,
+        wrongCount: wrongRecords.length,
+        currentStudentId,
+        isTeacherMode,
+        mockStudents,
         addWrongRecord,
         setCaseCompleted,
         setCurrentCase,
         clearAllData,
         getStats,
+        getStatsByStudent,
         getCasesByCategory,
-        getWrongRecordsByCategory
+        getWrongRecordsByCategory,
+        getWrongRecordsByStudent,
+        switchStudent,
+        toggleTeacherMode
       }}
     >
       {children}

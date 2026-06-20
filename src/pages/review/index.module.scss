@@ -341,3 +341,179 @@
   font-weight: $font-weight-semibold;
   color: $color-primary;
 }
+
+.modeSwitch {
+  display: flex;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: $radius-button;
+  padding: 4rpx;
+  margin-bottom: $spacing-md;
+  align-self: flex-start;
+}
+
+.modeSwitchItem {
+  padding: $spacing-xs $spacing-md;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: $font-weight-medium;
+  transition: all $transition-base;
+}
+
+.modeSwitchItemActive {
+  background: rgba(255, 255, 255, 0.95);
+  color: #7C3AED;
+  font-weight: $font-weight-semibold;
+}
+
+.studentList {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-sm;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-lg;
+  display: flex;
+  gap: $spacing-sm;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.studentItem {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-md $spacing-lg;
+  border-radius: $radius-md;
+  min-width: 140rpx;
+  transition: all $transition-base;
+  flex-shrink: 0;
+  white-space: normal;
+}
+
+.studentItemActive {
+  background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
+
+  :global {
+    .studentAvatar,
+    .studentName,
+    .studentTitle {
+      color: $color-text-white !important;
+    }
+  }
+}
+
+.studentAvatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: $color-bg-page;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+}
+
+.studentName {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  text-align: center;
+}
+
+.studentTitle {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  text-align: center;
+}
+
+.studentStatsBar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.studentStatBox {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  text-align: center;
+  box-shadow: $shadow-card;
+}
+
+.studentStatValue {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.studentStatLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.followUpBox {
+  margin-top: $spacing-lg;
+  padding: $spacing-lg;
+  background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+  border-radius: $radius-lg;
+  border: 2rpx solid rgba(245, 158, 11, 0.2);
+}
+
+.followUpTitle {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: #92400E;
+  margin-bottom: $spacing-md;
+}
+
+.followUpList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.followUpItem {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: $radius-md;
+}
+
+.followUpIcon {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-sm;
+  background: rgba(245, 158, 11, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  flex-shrink: 0;
+}
+
+.followUpText {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: #78350F;
+  line-height: 1.5;
+  font-weight: $font-weight-medium;
+}
+
+.noFollowUp {
+  font-size: $font-size-sm;
+  color: #92400E;
+  opacity: 0.7;
+  padding: $spacing-md;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: $radius-md;
+}

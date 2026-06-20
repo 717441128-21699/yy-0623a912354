@@ -3,7 +3,7 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import styles from './index.module.scss';
 import { useTraining } from '@/store/TrainingContext';
-import { mockCases, caseCategoryLabels } from '@/data/cases';
+import { mockCases } from '@/data/cases';
 import { CaseCategory } from '@/types';
 import StatsCard from '@/components/StatsCard';
 import CaseCard from '@/components/CaseCard';
@@ -11,7 +11,14 @@ import ProgressBar from '@/components/ProgressBar';
 import classnames from 'classnames';
 
 const HomePage: React.FC = () => {
-  const { getStats, completedCaseIds, setCurrentCase, wrongRecords, clearAllData, wrongCount } = useTraining();
+  const {
+    getStats,
+    completedCaseIds,
+    setCurrentCase,
+    clearAllData,
+    wrongCount
+  } = useTraining();
+
   const [activeCategory, setActiveCategory] = useState<CaseCategory | 'all'>('all');
   const [, forceUpdate] = useState(0);
 
@@ -19,7 +26,7 @@ const HomePage: React.FC = () => {
     forceUpdate(n => n + 1);
   });
 
-  const stats = useMemo(() => getStats(), [getStats, completedCaseIds.length, wrongRecords.length]);
+  const stats = useMemo(() => getStats(), [getStats, completedCaseIds.length, wrongCount]);
 
   const categoryConfig: Array<{ key: CaseCategory | 'all'; icon: string; name: string }> = [
     { key: 'all', icon: '📚', name: '全部病例' },
@@ -61,6 +68,8 @@ const HomePage: React.FC = () => {
     return mockCases.filter(c => c.category === key).length;
   };
 
+  const weaknessCount = Object.values(stats.weaknessDistribution).filter(v => v > 0).length;
+
   return (
     <ScrollView scrollY className={styles.page} style={{ height: '100vh' }}>
       <View className={styles.page} style={{ padding: '0 32rpx' }}>
@@ -97,7 +106,7 @@ const HomePage: React.FC = () => {
           />
           <StatsCard
             title="薄弱项"
-            value={Object.values(stats.weaknessDistribution).filter(v => v > 0).length}
+            value={weaknessCount}
             unit="类"
             icon="🔍"
             color="warning"
@@ -124,7 +133,7 @@ const HomePage: React.FC = () => {
 
         <View className={styles.sectionHeader}>
           <View className={styles.sectionTitle}>
-            <Text className={styles.sectionTitleIcon}>�</Text>
+            <Text className={styles.sectionTitleIcon}>🎮</Text>
             <Text className={styles.sectionTitleText}>病例闯关</Text>
           </View>
           <View className={styles.reviewBtn} onClick={handleGoReview}>

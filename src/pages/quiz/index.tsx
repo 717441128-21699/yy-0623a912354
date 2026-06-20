@@ -31,6 +31,7 @@ const QuizPage: React.FC = () => {
   const [currentAnalysis, setCurrentAnalysis] = useState<AuditItem['analysis'] | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [caseCompletedMarked, setCaseCompletedMarked] = useState(false);
+  const [lastAnsweredCorrect, setLastAnsweredCorrect] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!caseData) {
@@ -52,9 +53,13 @@ const QuizPage: React.FC = () => {
   const score = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
 
   const handleAnswer = (item: AuditItem, userAnswer: boolean) => {
-    setAnswers(prev => ({ ...prev, [item.key]: userAnswer }));
-
     const isCorrect = userAnswer === item.isCompliant;
+    setLastAnsweredCorrect(isCorrect);
+
+    setAnswers(prev => {
+      if (prev[item.key] !== undefined) return prev;
+      return { ...prev, [item.key]: userAnswer };
+    });
 
     if (!isCorrect) {
       const existingRecord = wrongRecords.find(
@@ -76,6 +81,11 @@ const QuizPage: React.FC = () => {
           timestamp: Date.now()
         });
       }
+
+      setTimeout(() => {
+        setCurrentAnalysis(item.analysis);
+        setShowAnalysis(true);
+      }, 200);
     }
   };
 
@@ -114,6 +124,7 @@ const QuizPage: React.FC = () => {
       informedConsent: undefined
     });
     setCaseCompletedMarked(false);
+    setLastAnsweredCorrect(null);
   };
 
   if (!caseData) return null;
@@ -181,29 +192,35 @@ const QuizPage: React.FC = () => {
               <Text className={styles.auditSectionText}>质控稽核判断</Text>
             </View>
             <View className={styles.auditHint}>
-              <Text>💡 请逐项判断病历材料是否符合门诊规范。判断错误将自动收录到错题本。</Text>
+              <Text>💡 请逐项判断是否符合门诊规范。答错将自动弹出风险解析，答对可手动查看。</Text>
             </View>
 
-            {caseData.auditItems.map((item, idx) => (
-              <View key={item.key}>
-                <QuestionCard
-                  auditItem={item}
-                  userAnswer={answers[item.key]}
-                  isAnswered={answers[item.key] !== undefined}
-                  onAnswer={(ans) => handleAnswer(item, ans)}
-                  index={idx + 1}
-                />
-                {answers[item.key] !== undefined && (
-                  <View
-                    className={styles.viewAnalysisBtn}
-                    onClick={() => handleViewAnalysis(item.analysis)}
-                  >
-                    <Text className={styles.viewAnalysisBtnText}>💡 查看风险解析</Text>
-                    <Text className={styles.viewAnalysisBtnText}>→</Text>
-                  </View>
-                )}
-              </View>
-            ))}
+            {caseData.auditItems.map((item, idx) => {
+              const isAnswered = answers[item.key] !== undefined;
+              const userAnswer = answers[item.key];
+              const isCorrectThis = userAnswer === item.isCompliant;
+
+              return (
+                <View key={item.key}>
+                  <QuestionCard
+                    auditItem={item}
+                    userAnswer={userAnswer}
+                    isAnswered={isAnswered}
+                    onAnswer={(ans) => handleAnswer(item, ans)}
+                    index={idx + 1}
+                  />
+                  {isAnswered && isCorrectThis && (
+                    <View
+                      className={styles.viewAnalysisBtn}
+                      onClick={() => handleViewAnalysis(item.analysis)}
+                    >
+                      <Text className={styles.viewAnalysisBtnText}>💡 查看风险解析</Text>
+                      <Text className={styles.viewAnalysisBtnText}>→</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
@@ -218,7 +235,7 @@ const QuizPage: React.FC = () => {
           <View className={styles.summaryItem}>
             <View className={classnames(styles.summaryDot, styles.dotWrong)} />
             <Text className={styles.summaryText}>错误</Text>
-            <Text className={classnames(styles.summaryValue, { [styles.dotWrong]: true })} style={{ color: '#EF4444' }}>{wrongCount}</Text>
+            <Text className={styles.summaryValue} style={{ color: '#EF4444' }}>{wrongCount}</Text>
           </View>
           <View className={styles.summaryItem}>
             <View className={classnames(styles.summaryDot, styles.dotPending)} />

@@ -1,18 +1,17 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useDidShow, useDidHide } from '@tarojs/taro';
 import { TrainingProvider } from './store/TrainingContext';
 import './app.scss';
 
-function App(props) {
-  useEffect(() => {});
+const App: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useDidShow(() => {});
   useDidHide(() => {});
 
   return (
     <TrainingProvider>
-      {props.children}
+      {children}
     </TrainingProvider>
   );
-}
+};
 
 export default App;

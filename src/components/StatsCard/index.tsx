@@ -8,7 +8,6 @@ interface StatsCardProps {
   value: string | number
   unit?: string
   icon?: string
-  trend?: 'up' | 'down' | 'none'
   color?: 'primary' | 'success' | 'warning' | 'error'
   subText?: string
 }

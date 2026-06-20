@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
-import Taro, { useRouter } from '@tarojs/taro';
+import Taro from '@tarojs/taro';
 import styles from './index.module.scss';
 import { useTraining } from '@/store/TrainingContext';
 import { mockCases } from '@/data/cases';
@@ -12,7 +12,6 @@ import AnalysisPanel from '@/components/AnalysisPanel';
 import classnames from 'classnames';
 
 const QuizPage: React.FC = () => {
-  const router = useRouter();
   const { currentCaseId, addWrongRecord, setCaseCompleted, wrongRecords } = useTraining();
 
   const caseData = useMemo<CaseData | undefined>(() => {
@@ -31,7 +30,6 @@ const QuizPage: React.FC = () => {
   const [currentAnalysis, setCurrentAnalysis] = useState<AuditItem['analysis'] | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [caseCompletedMarked, setCaseCompletedMarked] = useState(false);
-  const [lastAnsweredCorrect, setLastAnsweredCorrect] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!caseData) {
@@ -54,7 +52,6 @@ const QuizPage: React.FC = () => {
 
   const handleAnswer = (item: AuditItem, userAnswer: boolean) => {
     const isCorrect = userAnswer === item.isCompliant;
-    setLastAnsweredCorrect(isCorrect);
 
     setAnswers(prev => {
       if (prev[item.key] !== undefined) return prev;
@@ -124,7 +121,6 @@ const QuizPage: React.FC = () => {
       informedConsent: undefined
     });
     setCaseCompletedMarked(false);
-    setLastAnsweredCorrect(null);
   };
 
   if (!caseData) return null;

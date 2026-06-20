@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import Taro from '@tarojs/taro'
-import { WrongRecord, TrainingStats, WeaknessCategory, CaseData, CaseCategory } from '@/types'
+import { WrongRecord, TrainingStats, WeaknessCategory, CaseData, CaseCategory, FollowUpTask, FollowUpStatus } from '@/types'
 import { mockCases } from '@/data/cases'
 import { calcWeaknessDistribution } from '@/utils'
 
@@ -20,7 +20,9 @@ interface TrainingContextType {
   wrongCount: number
   currentStudentId: string
   isTeacherMode: boolean
+  teacherViewMode: 'overview' | 'detail'
   mockStudents: MockStudent[]
+  followUpTasks: FollowUpTask[]
   addWrongRecord: (record: WrongRecord) => void
   setCaseCompleted: (caseId: string) => void
   setCurrentCase: (caseId: string) => void
@@ -32,6 +34,13 @@ interface TrainingContextType {
   getWrongRecordsByStudent: (studentId: string) => WrongRecord[]
   switchStudent: (studentId: string) => void
   toggleTeacherMode: () => void
+  setTeacherViewMode: (mode: 'overview' | 'detail') => void
+  getTopWeaknessByStudent: (studentId: string) => WeaknessCategory | null
+  addFollowUpTask: (task: Omit<FollowUpTask, 'id' | 'createdAt' | 'updatedAt'>) => void
+  updateFollowUpStatus: (taskId: string, status: FollowUpStatus) => void
+  removeFollowUpTask: (taskId: string) => void
+  getFollowUpTasksByStudent: (studentId: string) => FollowUpTask[]
+  generateFollowUpTasksForStudent: (studentId: string) => void
 }
 
 const TrainingContext = createContext<TrainingContextType | null>(null)
@@ -41,6 +50,8 @@ const STORAGE_KEY_COMPLETED = 'dental_qc_completed_cases_v2'
 const STORAGE_KEY_MODE = 'dental_qc_mode'
 const STORAGE_KEY_STUDENT = 'dental_qc_current_student'
 const STORAGE_KEY_STUDENTS = 'dental_qc_students_v2'
+const STORAGE_KEY_TEACHER_VIEW = 'dental_qc_teacher_view'
+const STORAGE_KEY_FOLLOWUP = 'dental_qc_followup_v2'
 
 const generateMockWrongRecords = (seed: number): WrongRecord[] => {
   const items: Array<{
@@ -177,6 +188,14 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
     loadStorage<boolean>(STORAGE_KEY_MODE, false)
   )
 
+  const [teacherViewMode, setTeacherViewModeState] = useState<'overview' | 'detail'>(() =>
+    loadStorage<'overview' | 'detail'>(STORAGE_KEY_TEACHER_VIEW, 'overview')
+  )
+
+  const [followUpTasks, setFollowUpTasks] = useState<FollowUpTask[]>(() =>
+    loadStorage<FollowUpTask[]>(STORAGE_KEY_FOLLOWUP, [])
+  )
+
   const [currentStudentId, setCurrentStudentId] = useState<string>(() =>
     loadStorage<string>(STORAGE_KEY_STUDENT, 'self')
   )
@@ -196,6 +215,14 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
   useEffect(() => {
     saveStorage(STORAGE_KEY_MODE, isTeacherMode)
   }, [isTeacherMode])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_TEACHER_VIEW, teacherViewMode)
+  }, [teacherViewMode])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_FOLLOWUP, followUpTasks)
+  }, [followUpTasks])
 
   useEffect(() => {
     saveStorage(STORAGE_KEY_STUDENT, currentStudentId)
@@ -287,10 +314,84 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
       const next = !prev
       if (next && currentStudentId === 'self' && mockStudents.length > 0) {
         setCurrentStudentId(mockStudents[0].id)
+        setTeacherViewModeState('overview')
       }
       return next
     })
   }, [currentStudentId, mockStudents])
+
+  const setTeacherViewMode = useCallback((mode: 'overview' | 'detail') => {
+    setTeacherViewModeState(mode)
+  }, [])
+
+  const getTopWeaknessByStudent = useCallback((studentId: string): WeaknessCategory | null => {
+    const stats = studentId === 'self'
+      ? computeStats(wrongRecords, completedCaseIds)
+      : getStatsByStudent(studentId)
+    const dist = stats.weaknessDistribution
+    const order: WeaknessCategory[] = ['medicalRecord', 'infectionControl', 'feeConsistency', 'followUpManagement']
+    let top: WeaknessCategory | null = null
+    let topCount = 0
+    order.forEach(k => {
+      if (dist[k] > topCount) {
+        topCount = dist[k]
+        top = k
+      }
+    })
+    return topCount > 0 ? top : null
+  }, [wrongRecords, completedCaseIds, computeStats, getStatsByStudent])
+
+  const addFollowUpTask = useCallback((task: Omit<FollowUpTask, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = Date.now()
+    setFollowUpTasks(prev => [
+      ...prev,
+      { ...task, id: `fu-${now}-${Math.random().toString(36).slice(2, 7)}`, createdAt: now, updatedAt: now }
+    ])
+  }, [])
+
+  const updateFollowUpStatus = useCallback((taskId: string, status: FollowUpStatus) => {
+    setFollowUpTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, status, updatedAt: Date.now() } : t
+    ))
+  }, [])
+
+  const removeFollowUpTask = useCallback((taskId: string) => {
+    setFollowUpTasks(prev => prev.filter(t => t.id !== taskId))
+  }, [])
+
+  const getFollowUpTasksByStudent = useCallback((studentId: string) => {
+    return followUpTasks.filter(t => t.studentId === studentId)
+  }, [followUpTasks])
+
+  const generateFollowUpTasksForStudent = useCallback((studentId: string) => {
+    const stats = studentId === 'self'
+      ? computeStats(wrongRecords, completedCaseIds)
+      : getStatsByStudent(studentId)
+    const total = Object.values(stats.weaknessDistribution).reduce((a, b) => a + b, 0)
+    if (total === 0) return
+
+    const order: WeaknessCategory[] = ['medicalRecord', 'infectionControl', 'feeConsistency', 'followUpManagement']
+    const now = Date.now()
+    const existing = followUpTasks.filter(t => t.studentId === studentId)
+
+    setFollowUpTasks(prev => {
+      const next = [...prev]
+      order.forEach(k => {
+        const ratio = stats.weaknessDistribution[k] / total
+        if (ratio >= 0.25 && !existing.some(e => e.category === k)) {
+          next.push({
+            id: `fu-${now}-${k}-${Math.random().toString(36).slice(2, 5)}`,
+            studentId,
+            category: k,
+            status: 'pending',
+            createdAt: now,
+            updatedAt: now
+          })
+        }
+      })
+      return next
+    })
+  }, [wrongRecords, completedCaseIds, computeStats, getStatsByStudent, followUpTasks])
 
   return (
     <TrainingContext.Provider
@@ -301,7 +402,9 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
         wrongCount: wrongRecords.length,
         currentStudentId,
         isTeacherMode,
+        teacherViewMode,
         mockStudents,
+        followUpTasks,
         addWrongRecord,
         setCaseCompleted,
         setCurrentCase,
@@ -312,7 +415,14 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
         getWrongRecordsByCategory,
         getWrongRecordsByStudent,
         switchStudent,
-        toggleTeacherMode
+        toggleTeacherMode,
+        setTeacherViewMode,
+        getTopWeaknessByStudent,
+        addFollowUpTask,
+        updateFollowUpStatus,
+        removeFollowUpTask,
+        getFollowUpTasksByStudent,
+        generateFollowUpTasksForStudent
       }}
     >
       {children}

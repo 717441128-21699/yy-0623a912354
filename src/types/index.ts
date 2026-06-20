@@ -55,3 +55,15 @@ export interface TrainingStats {
   wrongCount: number
   weaknessDistribution: Record<WeaknessCategory, number>
 }
+
+export type FollowUpStatus = 'pending' | 'scheduled' | 'done'
+
+export interface FollowUpTask {
+  id: string
+  studentId: string
+  category: WeaknessCategory
+  status: FollowUpStatus
+  createdAt: number
+  updatedAt: number
+  note?: string
+}

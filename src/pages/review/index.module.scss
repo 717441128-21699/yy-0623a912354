@@ -517,3 +517,498 @@
   background: rgba(255, 255, 255, 0.5);
   border-radius: $radius-md;
 }
+
+// ========== 班级总览 ==========
+.viewModeSwitch {
+  display: flex;
+  gap: $spacing-sm;
+  margin: $spacing-md 0 $spacing-lg;
+  background: #F1F5F9;
+  padding: 6rpx;
+  border-radius: $radius-md;
+}
+
+.viewModeSwitchItem {
+  flex: 1;
+  padding: 18rpx 0;
+  text-align: center;
+  font-size: $font-size-sm;
+  color: #64748B;
+  border-radius: 10rpx;
+  font-weight: $font-weight-medium;
+
+  text {
+    font-size: $font-size-sm;
+  }
+}
+
+.viewModeSwitchItemActive {
+  background: #fff;
+  color: #1E40AF;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.05);
+  font-weight: $font-weight-semibold;
+}
+
+.classListSection {
+  margin-bottom: $spacing-xl;
+}
+
+.classSummaryBar {
+  display: flex;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.classSummaryItem {
+  flex: 1;
+  background: #fff;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  box-shadow: $shadow-card;
+  text-align: center;
+}
+
+.classSummaryValue {
+  display: block;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: #1E293B;
+  line-height: 1.2;
+}
+
+.classSummaryLabel {
+  display: block;
+  font-size: $font-size-xs;
+  color: #94A3B8;
+  margin-top: 4rpx;
+}
+
+.classOverviewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.classStudentCard {
+  background: #fff;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  border: 2rpx solid transparent;
+  transition: all $transition-fast;
+}
+
+.classStudentCardActive {
+  border-color: #3B82F6;
+  background: #EFF6FF;
+}
+
+.classStudentCardTop {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-md;
+}
+
+.classStudentAvatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  margin-right: $spacing-md;
+  flex-shrink: 0;
+}
+
+.classStudentInfo {
+  flex: 1;
+}
+
+.classStudentName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+  margin-bottom: 4rpx;
+  display: block;
+}
+
+.classStudentTitle {
+  font-size: $font-size-sm;
+  color: #64748B;
+  display: block;
+}
+
+.classStudentStats {
+  display: flex;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.classStudentStatBox {
+  flex: 1;
+  background: #F8FAFC;
+  border-radius: $radius-sm;
+  padding: $spacing-sm;
+  text-align: center;
+}
+
+.classStudentStatBoxDanger {
+  background: #FEF2F2;
+}
+
+.classStudentStatValue {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+}
+
+.classStudentStatLabel {
+  display: block;
+  font-size: $font-size-xs;
+  color: #94A3B8;
+  margin-top: 2rpx;
+}
+
+.classStudentTopWeak {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, #FEF3C7, #FDE68A);
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-sm;
+  margin-bottom: $spacing-md;
+}
+
+.classStudentWeakIcon {
+  font-size: 28rpx;
+  margin-right: $spacing-sm;
+}
+
+.classStudentWeakLabel {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: #92400E;
+  font-weight: $font-weight-medium;
+}
+
+.classStudentWeakValue {
+  font-size: $font-size-sm;
+  color: #92400E;
+  font-weight: $font-weight-bold;
+}
+
+.classStudentCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: $spacing-md;
+  border-top: 1rpx solid #F1F5F9;
+}
+
+.classStudentTaskTip {
+  font-size: $font-size-xs;
+  color: #64748B;
+}
+
+.classStudentViewBtn {
+  padding: 14rpx 28rpx;
+  background: #2563EB;
+  border-radius: $radius-round;
+
+  text {
+    font-size: $font-size-sm;
+    color: #fff;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+// ========== 交叉筛选 ==========
+.filterSection {
+  margin-bottom: $spacing-lg;
+}
+
+.filterGroupTitle {
+  font-size: $font-size-sm;
+  color: #475569;
+  font-weight: $font-weight-medium;
+  margin-bottom: $spacing-sm;
+  display: block;
+}
+
+.filterGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.filterChip {
+  padding: 14rpx 24rpx;
+  background: #F1F5F9;
+  border-radius: $radius-round;
+  border: 2rpx solid transparent;
+
+  text {
+    font-size: $font-size-sm;
+    color: #475569;
+  }
+}
+
+.filterChipActive {
+  background: #EFF6FF;
+  border-color: #3B82F6;
+
+  text {
+    color: #1D4ED8;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.filterResetBtn {
+  padding: 14rpx 24rpx;
+  background: #FEF2F2;
+  border-radius: $radius-round;
+
+  text {
+    font-size: $font-size-sm;
+    color: #DC2626;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.filterAppliedBar {
+  display: flex;
+  align-items: center;
+  padding: $spacing-sm $spacing-md;
+  background: #EFF6FF;
+  border-radius: $radius-sm;
+  margin-top: $spacing-sm;
+}
+
+.filterAppliedBarText {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: #1E40AF;
+  font-weight: $font-weight-medium;
+}
+
+.filterAppliedBarCount {
+  font-size: $font-size-sm;
+  color: #1E40AF;
+  font-weight: $font-weight-bold;
+}
+
+// ========== 跟诊任务面板 ==========
+.followUpPanel {
+  background: #fff;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-top: $spacing-lg;
+}
+
+.followUpPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.followUpPanelTitle {
+  display: flex;
+  align-items: center;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+}
+
+.followUpPanelTitleIcon {
+  font-size: 28rpx;
+  margin-right: $spacing-sm;
+}
+
+.followUpGenBtn {
+  padding: 12rpx 24rpx;
+  background: #059669;
+  border-radius: $radius-round;
+
+  text {
+    font-size: $font-size-sm;
+    color: #fff;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.followUpTaskList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.followUpTaskItem {
+  display: flex;
+  align-items: flex-start;
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  border: 2rpx solid #E2E8F0;
+  background: #F8FAFC;
+}
+
+.followUpTaskItemScheduled {
+  background: #FFF7ED;
+  border-color: #FED7AA;
+}
+
+.followUpTaskItemDone {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+  opacity: 0.75;
+}
+
+.followUpTaskIcon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-right: $spacing-md;
+  flex-shrink: 0;
+}
+
+.followUpTaskContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.followUpTaskTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.followUpTaskName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+  display: block;
+}
+
+.followUpTaskDesc {
+  font-size: $font-size-sm;
+  color: #64748B;
+  line-height: 1.5;
+  margin-bottom: $spacing-sm;
+  display: block;
+}
+
+.followUpTaskTime {
+  font-size: $font-size-xs;
+  color: #94A3B8;
+  display: block;
+}
+
+.followUpTaskStatusBar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}
+
+.followUpStatusChip {
+  padding: 8rpx 18rpx;
+  border-radius: $radius-round;
+  background: #F1F5F9;
+
+  text {
+    font-size: $font-size-xs;
+    color: #64748B;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.followUpStatusChipPending {
+  background: #FEF2F2;
+
+  text {
+    color: #DC2626;
+  }
+}
+
+.followUpStatusChipScheduled {
+  background: #FFF7ED;
+
+  text {
+    color: #EA580C;
+  }
+}
+
+.followUpStatusChipDone {
+  background: #F0FDF4;
+
+  text {
+    color: #059669;
+  }
+}
+
+.followUpTaskActions {
+  display: flex;
+  gap: $spacing-xs;
+  margin-left: auto;
+}
+
+.followUpActionBtn {
+  padding: 10rpx 20rpx;
+  border-radius: $radius-round;
+  background: #E2E8F0;
+
+  text {
+    font-size: $font-size-xs;
+    color: #475569;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.followUpActionBtnPrimary {
+  background: #2563EB;
+
+  text {
+    color: #fff;
+  }
+}
+
+.followUpActionBtnSuccess {
+  background: #059669;
+
+  text {
+    color: #fff;
+  }
+}
+
+.followUpActionBtnDanger {
+  background: #FEE2E2;
+
+  text {
+    color: #DC2626;
+  }
+}
+
+.followUpEmpty {
+  padding: $spacing-xl $spacing-md;
+  text-align: center;
+  background: #F8FAFC;
+  border-radius: $radius-md;
+  border: 2rpx dashed #CBD5E1;
+}
+
+.followUpEmptyText {
+  font-size: $font-size-sm;
+  color: #94A3B8;
+  display: block;
+}
+

@@ -519,3 +519,9 @@ export const weaknessCategoryIcons: Record<string, string> = {
   feeConsistency: '💰',
   followUpManagement: '📅'
 }
+
+export const caseCategoryIcons: Record<string, string> = {
+  implant: '🦷',
+  orthodontic: '😁',
+  endodontic: '🔬'
+}

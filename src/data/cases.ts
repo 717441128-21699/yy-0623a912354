@@ -525,3 +525,12 @@ export const caseCategoryIcons: Record<string, string> = {
   orthodontic: '😁',
   endodontic: '🔬'
 }
+
+export const clinicSceneLabels: Record<string, string> = {
+  comprehensive: '综合门诊',
+  implant: '种植门诊',
+  orthodontic: '正畸门诊',
+  endodontic: '牙体牙髓',
+  pediatric: '儿科门诊',
+  surgery: '外科门诊'
+}

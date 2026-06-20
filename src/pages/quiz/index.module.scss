@@ -411,3 +411,19 @@
   color: $color-primary;
   font-weight: $font-weight-medium;
 }
+
+.specialCaseTag {
+  padding: 10rpx 20rpx;
+  background: #FEF3C7;
+  border-radius: $radius-round;
+  margin-top: $spacing-md;
+  margin-bottom: -8rpx;
+  align-self: flex-start;
+  display: inline-flex;
+}
+
+.specialCaseTagText {
+  font-size: $font-size-xs;
+  color: #92400E;
+  font-weight: $font-weight-medium;
+}

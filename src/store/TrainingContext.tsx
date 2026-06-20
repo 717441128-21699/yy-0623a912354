@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 import Taro from '@tarojs/taro'
-import { WrongRecord, TrainingStats, WeaknessCategory, CaseData, CaseCategory, FollowUpTask, FollowUpStatus } from '@/types'
+import {
+  WrongRecord,
+  TrainingStats,
+  WeaknessCategory,
+  CaseData,
+  CaseCategory,
+  FollowUpTask,
+  FollowUpStatus,
+  ClinicScene,
+  CaseSessionRecord,
+  SpecialPracticeConfig,
+  AuditItemKey
+} from '@/types'
 import { mockCases } from '@/data/cases'
 import { calcWeaknessDistribution } from '@/utils'
 
@@ -11,6 +23,7 @@ export interface MockStudent {
   title: string
   completedCaseIds: string[]
   wrongRecords: WrongRecord[]
+  sessionRecords: CaseSessionRecord[]
 }
 
 interface TrainingContextType {
@@ -23,8 +36,11 @@ interface TrainingContextType {
   teacherViewMode: 'overview' | 'detail'
   mockStudents: MockStudent[]
   followUpTasks: FollowUpTask[]
+  sessionRecords: CaseSessionRecord[]
+  specialPractice: SpecialPracticeConfig | null
+  isSpecialMode: boolean
   addWrongRecord: (record: WrongRecord) => void
-  setCaseCompleted: (caseId: string) => void
+  setCaseCompleted: (caseId: string, session?: Omit<CaseSessionRecord, 'id' | 'completedAt'>) => void
   setCurrentCase: (caseId: string) => void
   clearAllData: () => void
   getStats: () => TrainingStats
@@ -38,9 +54,39 @@ interface TrainingContextType {
   getTopWeaknessByStudent: (studentId: string) => WeaknessCategory | null
   addFollowUpTask: (task: Omit<FollowUpTask, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateFollowUpStatus: (taskId: string, status: FollowUpStatus) => void
+  updateFollowUpDetails: (taskId: string, patch: Partial<Pick<FollowUpTask, 'scheduledDate' | 'clinicScene' | 'note'>>) => void
   removeFollowUpTask: (taskId: string) => void
   getFollowUpTasksByStudent: (studentId: string) => FollowUpTask[]
+  getFollowUpTasksByDate: (date: string) => FollowUpTask[]
   generateFollowUpTasksForStudent: (studentId: string) => void
+  getSessionRecordsByStudent: (studentId: string, limit?: number) => CaseSessionRecord[]
+  getTrendByStudent: (studentId: string, lastN?: number) => Array<{
+    idx: number
+    label: string
+    score: number
+    correctRate: number
+    wrongCount: number
+    delta: 'up' | 'down' | 'flat'
+  }>
+  generateSpecialPractice: (filter: {
+    caseCategory: CaseCategory | 'all'
+    weakness: WeaknessCategory | 'all'
+  }) => number
+  clearSpecialPractice: () => void
+  getCurrentSpecialAuditItems: () => Array<{
+    caseId: string
+    caseTitle: string
+    caseCategory: CaseCategory
+    auditItemKey: AuditItemKey
+    patientInfo: { age: string; gender: string }
+    rawMaterials: {
+      chiefComplaintRaw: string
+      examinationRaw: string
+      treatmentPlanRaw: string
+      imagingNote: string
+      consentNote: string
+    }
+  }>
 }
 
 const TrainingContext = createContext<TrainingContextType | null>(null)
@@ -49,16 +95,18 @@ const STORAGE_KEY_WRONG = 'dental_qc_wrong_records_v2'
 const STORAGE_KEY_COMPLETED = 'dental_qc_completed_cases_v2'
 const STORAGE_KEY_MODE = 'dental_qc_mode'
 const STORAGE_KEY_STUDENT = 'dental_qc_current_student'
-const STORAGE_KEY_STUDENTS = 'dental_qc_students_v2'
+const STORAGE_KEY_STUDENTS = 'dental_qc_students_v3'
 const STORAGE_KEY_TEACHER_VIEW = 'dental_qc_teacher_view'
-const STORAGE_KEY_FOLLOWUP = 'dental_qc_followup_v2'
+const STORAGE_KEY_FOLLOWUP = 'dental_qc_followup_v3'
+const STORAGE_KEY_SESSIONS = 'dental_qc_session_records_v1'
+const STORAGE_KEY_SPECIAL = 'dental_qc_special_practice_v1'
 
 const generateMockWrongRecords = (seed: number): WrongRecord[] => {
   const items: Array<{
     caseId: string
     caseTitle: string
     category: CaseCategory
-    auditItemKey: import('@/types').AuditItemKey
+    auditItemKey: AuditItemKey
     auditItemLabel: string
     weaknessCategory: WeaknessCategory
     analysis: import('@/types').AuditItem['analysis']
@@ -94,6 +142,27 @@ const generateMockWrongRecords = (seed: number): WrongRecord[] => {
   }))
 }
 
+const generateMockSessions = (seed: number, completedIds: string[]): CaseSessionRecord[] => {
+  const result: CaseSessionRecord[] = []
+  const now = Date.now()
+  completedIds.forEach((cid, i) => {
+    const c = mockCases.find(x => x.id === cid)
+    if (!c) return
+    const s = Math.max(40, Math.min(100, 60 + seed * 5 + i * 7 - Math.floor(Math.random() * 30)))
+    result.push({
+      id: `sess-${seed}-${i}`,
+      caseId: cid,
+      caseTitle: c.title,
+      category: c.category,
+      completedAt: now - (completedIds.length - i) * 86400_000,
+      correctCount: Math.round(s / 20),
+      wrongCount: 5 - Math.round(s / 20),
+      score: s
+    })
+  })
+  return result
+}
+
 const defaultMockStudents: MockStudent[] = [
   {
     id: 'stu-001',
@@ -101,7 +170,8 @@ const defaultMockStudents: MockStudent[] = [
     avatar: '👨‍⚕️',
     title: '规培第一年',
     completedCaseIds: ['implant-001', 'orthodontic-001', 'endodontic-001'],
-    wrongRecords: generateMockWrongRecords(1)
+    wrongRecords: generateMockWrongRecords(1),
+    sessionRecords: generateMockSessions(1, ['implant-001', 'orthodontic-001', 'endodontic-001'])
   },
   {
     id: 'stu-002',
@@ -109,7 +179,8 @@ const defaultMockStudents: MockStudent[] = [
     avatar: '👩‍⚕️',
     title: '新入职3个月',
     completedCaseIds: ['implant-001', 'implant-002', 'endodontic-001'],
-    wrongRecords: generateMockWrongRecords(2)
+    wrongRecords: generateMockWrongRecords(2),
+    sessionRecords: generateMockSessions(2, ['implant-001', 'implant-002', 'endodontic-001'])
   },
   {
     id: 'stu-003',
@@ -117,7 +188,8 @@ const defaultMockStudents: MockStudent[] = [
     avatar: '🧑‍⚕️',
     title: '口腔医学生·大五',
     completedCaseIds: ['orthodontic-001', 'endodontic-001'],
-    wrongRecords: generateMockWrongRecords(3)
+    wrongRecords: generateMockWrongRecords(3),
+    sessionRecords: generateMockSessions(3, ['orthodontic-001', 'endodontic-001'])
   },
   {
     id: 'stu-004',
@@ -125,7 +197,8 @@ const defaultMockStudents: MockStudent[] = [
     avatar: '👩‍🎓',
     title: '规培第二年',
     completedCaseIds: ['implant-001', 'implant-002', 'orthodontic-001', 'orthodontic-002', 'endodontic-001', 'endodontic-002'],
-    wrongRecords: generateMockWrongRecords(4)
+    wrongRecords: generateMockWrongRecords(4),
+    sessionRecords: generateMockSessions(4, ['implant-001', 'implant-002', 'orthodontic-001', 'orthodontic-002', 'endodontic-001', 'endodontic-002'])
   }
 ]
 
@@ -169,6 +242,11 @@ const removeStorage = (key: string) => {
   }
 }
 
+const formatDateLabel = (ts: number) => {
+  const d = new Date(ts)
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
 export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [wrongRecords, setWrongRecords] = useState<WrongRecord[]>(() =>
     loadStorage<WrongRecord[]>(STORAGE_KEY_WRONG, [])
@@ -194,6 +272,14 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const [followUpTasks, setFollowUpTasks] = useState<FollowUpTask[]>(() =>
     loadStorage<FollowUpTask[]>(STORAGE_KEY_FOLLOWUP, [])
+  )
+
+  const [sessionRecords, setSessionRecords] = useState<CaseSessionRecord[]>(() =>
+    loadStorage<CaseSessionRecord[]>(STORAGE_KEY_SESSIONS, [])
+  )
+
+  const [specialPractice, setSpecialPractice] = useState<SpecialPracticeConfig | null>(() =>
+    loadStorage<SpecialPracticeConfig | null>(STORAGE_KEY_SPECIAL, null)
   )
 
   const [currentStudentId, setCurrentStudentId] = useState<string>(() =>
@@ -225,8 +311,18 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [followUpTasks])
 
   useEffect(() => {
+    saveStorage(STORAGE_KEY_SESSIONS, sessionRecords)
+  }, [sessionRecords])
+
+  useEffect(() => {
+    saveStorage(STORAGE_KEY_SPECIAL, specialPractice)
+  }, [specialPractice])
+
+  useEffect(() => {
     saveStorage(STORAGE_KEY_STUDENT, currentStudentId)
   }, [currentStudentId])
+
+  const isSpecialMode = specialPractice !== null
 
   const computeStats = useCallback((wrongs: WrongRecord[], completed: string[]): TrainingStats => {
     const totalCases = mockCases.length
@@ -273,11 +369,20 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
     })
   }, [])
 
-  const setCaseCompleted = useCallback((caseId: string) => {
+  const setCaseCompleted = useCallback((caseId: string, session?: Omit<CaseSessionRecord, 'id' | 'completedAt'>) => {
     setCompletedCaseIds(prev => {
       if (prev.includes(caseId)) return prev
       return [...prev, caseId]
     })
+    if (session) {
+      const now = Date.now()
+      const record: CaseSessionRecord = {
+        ...session,
+        id: `sess-${now}-${Math.random().toString(36).slice(2, 7)}`,
+        completedAt: now
+      }
+      setSessionRecords(prev => [...prev, record])
+    }
   }, [])
 
   const setCurrentCase = useCallback((caseId: string) => {
@@ -287,8 +392,12 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearAllData = useCallback(() => {
     setWrongRecords([])
     setCompletedCaseIds([])
+    setSessionRecords([])
+    setSpecialPractice(null)
     removeStorage(STORAGE_KEY_WRONG)
     removeStorage(STORAGE_KEY_COMPLETED)
+    removeStorage(STORAGE_KEY_SESSIONS)
+    removeStorage(STORAGE_KEY_SPECIAL)
   }, [])
 
   const getCasesByCategory = useCallback((category: CaseCategory) => {
@@ -325,9 +434,7 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [])
 
   const getTopWeaknessByStudent = useCallback((studentId: string): WeaknessCategory | null => {
-    const stats = studentId === 'self'
-      ? computeStats(wrongRecords, completedCaseIds)
-      : getStatsByStudent(studentId)
+    const stats = getStatsByStudent(studentId)
     const dist = stats.weaknessDistribution
     const order: WeaknessCategory[] = ['medicalRecord', 'infectionControl', 'feeConsistency', 'followUpManagement']
     let top: WeaknessCategory | null = null
@@ -339,7 +446,7 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     })
     return topCount > 0 ? top : null
-  }, [wrongRecords, completedCaseIds, computeStats, getStatsByStudent])
+  }, [getStatsByStudent])
 
   const addFollowUpTask = useCallback((task: Omit<FollowUpTask, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = Date.now()
@@ -355,18 +462,31 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
     ))
   }, [])
 
+  const updateFollowUpDetails = useCallback((taskId: string, patch: Partial<Pick<FollowUpTask, 'scheduledDate' | 'clinicScene' | 'note'>>) => {
+    setFollowUpTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, ...patch, updatedAt: Date.now() } : t
+    ))
+  }, [])
+
   const removeFollowUpTask = useCallback((taskId: string) => {
     setFollowUpTasks(prev => prev.filter(t => t.id !== taskId))
   }, [])
 
   const getFollowUpTasksByStudent = useCallback((studentId: string) => {
-    return followUpTasks.filter(t => t.studentId === studentId)
+    return followUpTasks.filter(t => t.studentId === studentId).sort((a, b) => {
+      if (!a.scheduledDate && !b.scheduledDate) return b.createdAt - a.createdAt
+      if (!a.scheduledDate) return 1
+      if (!b.scheduledDate) return -1
+      return a.scheduledDate.localeCompare(b.scheduledDate)
+    })
+  }, [followUpTasks])
+
+  const getFollowUpTasksByDate = useCallback((date: string) => {
+    return followUpTasks.filter(t => t.scheduledDate === date)
   }, [followUpTasks])
 
   const generateFollowUpTasksForStudent = useCallback((studentId: string) => {
-    const stats = studentId === 'self'
-      ? computeStats(wrongRecords, completedCaseIds)
-      : getStatsByStudent(studentId)
+    const stats = getStatsByStudent(studentId)
     const total = Object.values(stats.weaknessDistribution).reduce((a, b) => a + b, 0)
     if (total === 0) return
 
@@ -391,7 +511,115 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
       })
       return next
     })
-  }, [wrongRecords, completedCaseIds, computeStats, getStatsByStudent, followUpTasks])
+  }, [getStatsByStudent, followUpTasks])
+
+  const getSessionRecordsByStudent = useCallback((studentId: string, limit?: number): CaseSessionRecord[] => {
+    let list: CaseSessionRecord[]
+    if (studentId === 'self') {
+      list = [...sessionRecords]
+    } else {
+      const stu = mockStudents.find(s => s.id === studentId)
+      list = stu ? [...stu.sessionRecords] : []
+    }
+    list.sort((a, b) => b.completedAt - a.completedAt)
+    return typeof limit === 'number' ? list.slice(0, limit) : list
+  }, [sessionRecords, mockStudents])
+
+  const getTrendByStudent = useCallback((studentId: string, lastN: number = 5) => {
+    const list = getSessionRecordsByStudent(studentId, lastN).reverse()
+    if (list.length === 0) return []
+    const result: Array<{
+      idx: number
+      label: string
+      score: number
+      correctRate: number
+      wrongCount: number
+      delta: 'up' | 'down' | 'flat'
+    }> = []
+    list.forEach((rec, i) => {
+      const total = rec.correctCount + rec.wrongCount
+      const correctRate = total > 0 ? Math.round((rec.correctCount / total) * 100) : 0
+      let delta: 'up' | 'down' | 'flat' = 'flat'
+      if (i > 0) {
+        const prev = result[i - 1]
+        if (correctRate > prev.correctRate) delta = 'up'
+        else if (correctRate < prev.correctRate) delta = 'down'
+      }
+      result.push({
+        idx: i + 1,
+        label: formatDateLabel(rec.completedAt),
+        score: rec.score,
+        correctRate,
+        wrongCount: rec.wrongCount,
+        delta
+      })
+    })
+    return result
+  }, [getSessionRecordsByStudent])
+
+  const generateSpecialPractice = useCallback((filter: {
+    caseCategory: CaseCategory | 'all'
+    weakness: WeaknessCategory | 'all'
+  }) => {
+    const pool: SpecialPracticeConfig['auditItems'] = []
+    const sourceIds: string[] = []
+
+    wrongRecords.forEach(wr => {
+      if (filter.caseCategory !== 'all' && wr.category !== filter.caseCategory) return
+      if (filter.weakness !== 'all' && wr.weaknessCategory !== filter.weakness) return
+      const c = mockCases.find(x => x.id === wr.caseId)
+      if (!c) return
+      const item = c.auditItems.find(a => a.key === wr.auditItemKey)
+      if (!item) return
+      pool.push({
+        caseId: c.id,
+        caseTitle: c.title,
+        caseCategory: c.category,
+        auditItemKey: item.key,
+        auditItem: item
+      })
+      sourceIds.push(wr.id)
+    })
+
+    const limited = pool.slice(0, Math.min(10, Math.max(3, pool.length)))
+    if (limited.length === 0) {
+      Taro.showToast({ title: '暂无可练习错题', icon: 'none' })
+      return 0
+    }
+
+    setSpecialPractice({
+      filterCaseCategory: filter.caseCategory,
+      filterWeakness: filter.weakness,
+      sourceWrongRecordIds: sourceIds,
+      auditItems: limited
+    })
+    return limited.length
+  }, [wrongRecords])
+
+  const clearSpecialPractice = useCallback(() => {
+    setSpecialPractice(null)
+  }, [])
+
+  const getCurrentSpecialAuditItems = useCallback(() => {
+    if (!specialPractice) return []
+    return specialPractice.auditItems.map(item => {
+      const c = mockCases.find(x => x.id === item.caseId)!
+      return {
+        caseId: item.caseId,
+        caseTitle: item.caseTitle,
+        caseCategory: item.caseCategory,
+        auditItemKey: item.auditItemKey,
+        patientInfo: { age: c.patientAge, gender: c.patientGender },
+        rawMaterials: {
+          chiefComplaintRaw: c.chiefComplaintRaw,
+          examinationRaw: c.examinationRaw,
+          treatmentPlanRaw: c.treatmentPlanRaw,
+          imagingNote: c.imagingNote,
+          consentNote: c.consentNote
+        }
+      }
+    })
+  }, [specialPractice])
 
   return (
     <TrainingContext.Provider
@@ -405,6 +633,9 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
         teacherViewMode,
         mockStudents,
         followUpTasks,
+        sessionRecords,
+        specialPractice,
+        isSpecialMode,
         addWrongRecord,
         setCaseCompleted,
         setCurrentCase,
@@ -420,9 +651,16 @@ export const TrainingProvider: React.FC<{ children: ReactNode }> = ({ children }
         getTopWeaknessByStudent,
         addFollowUpTask,
         updateFollowUpStatus,
+        updateFollowUpDetails,
         removeFollowUpTask,
         getFollowUpTasksByStudent,
-        generateFollowUpTasksForStudent
+        getFollowUpTasksByDate,
+        generateFollowUpTasksForStudent,
+        getSessionRecordsByStudent,
+        getTrendByStudent,
+        generateSpecialPractice,
+        clearSpecialPractice,
+        getCurrentSpecialAuditItems
       }}
     >
       {children}
@@ -437,3 +675,5 @@ export const useTraining = () => {
   }
   return ctx
 }
+
+export type { ClinicScene }

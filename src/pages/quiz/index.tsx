@@ -3,84 +3,207 @@ import { View, Text, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import styles from './index.module.scss';
 import { useTraining } from '@/store/TrainingContext';
-import { mockCases } from '@/data/cases';
-import { AuditItem, CaseData, AuditItemKey } from '@/types';
+import { mockCases, weaknessCategoryLabels, caseCategoryLabels } from '@/data/cases';
+import { AuditItem, CaseData, AuditItemKey, CaseCategory } from '@/types';
 import CategoryTag from '@/components/CategoryTag';
 import ProgressBar from '@/components/ProgressBar';
 import QuestionCard from '@/components/QuestionCard';
 import AnalysisPanel from '@/components/AnalysisPanel';
 import classnames from 'classnames';
 
-const QuizPage: React.FC = () => {
-  const { currentCaseId, addWrongRecord, setCaseCompleted, wrongRecords } = useTraining();
+interface SpecialVirtualCase {
+  kind: 'special'
+  virtualCaseId: string
+  title: string
+  category: CaseCategory
+  patientAge: string
+  patientGender: string
+  items: Array<{
+    idx: number
+    caseId: string
+    caseTitle: string
+    caseCategory: CaseCategory
+    auditItemKey: AuditItemKey
+    patientAge: string
+    patientGender: string
+    chiefComplaintRaw: string
+    examinationRaw: string
+    treatmentPlanRaw: string
+    imagingNote: string
+    consentNote: string
+    auditItem: AuditItem
+  }>
+  filterLabel: string
+}
 
-  const caseData = useMemo<CaseData | undefined>(() => {
+const QuizPage: React.FC = () => {
+  const {
+    currentCaseId,
+    addWrongRecord,
+    setCaseCompleted,
+    wrongRecords,
+    isSpecialMode,
+    specialPractice,
+    getCurrentSpecialAuditItems,
+    clearSpecialPractice
+  } = useTraining();
+
+  const normalCase = useMemo<CaseData | undefined>(() => {
     return mockCases.find(c => c.id === currentCaseId);
   }, [currentCaseId]);
 
-  const [answers, setAnswers] = useState<Record<AuditItemKey, boolean | undefined>>({
-    chiefComplaint: undefined,
-    examination: undefined,
-    treatmentPlan: undefined,
-    imaging: undefined,
-    informedConsent: undefined
-  });
+  const specialCase = useMemo<SpecialVirtualCase | null>(() => {
+    if (!isSpecialMode || !specialPractice) return null;
+    const rawItems = getCurrentSpecialAuditItems();
+    const items = rawItems.map((it, idx) => ({
+      idx,
+      ...it,
+      patientAge: it.patientInfo.age,
+      patientGender: it.patientInfo.gender,
+      chiefComplaintRaw: it.rawMaterials.chiefComplaintRaw,
+      examinationRaw: it.rawMaterials.examinationRaw,
+      treatmentPlanRaw: it.rawMaterials.treatmentPlanRaw,
+      imagingNote: it.rawMaterials.imagingNote,
+      consentNote: it.rawMaterials.consentNote,
+      auditItem: mockCases.find(c => c.id === it.caseId)!.auditItems.find(a => a.key === it.auditItemKey)!
+    }));
 
+    let filterLabel = '';
+    const parts: string[] = [];
+    if (specialPractice.filterCaseCategory !== 'all') {
+      parts.push(caseCategoryLabels[specialPractice.filterCaseCategory]);
+    }
+    if (specialPractice.filterWeakness !== 'all') {
+      parts.push(weaknessCategoryLabels[specialPractice.filterWeakness]);
+    }
+    if (parts.length > 0) {
+      filterLabel = parts.join(' × ');
+    } else {
+      filterLabel = '薄弱项全科';
+    }
+
+    const first = items[0];
+    return {
+      kind: 'special',
+      virtualCaseId: `special-${Date.now()}`,
+      title: `专项再练：${filterLabel}（${items.length}题）`,
+      category: first ? first.caseCategory : 'implant',
+      patientAge: '专项',
+      patientGender: '练习',
+      items,
+      filterLabel
+    };
+  }, [isSpecialMode, specialPractice, getCurrentSpecialAuditItems]);
+
+  const mode: 'normal' | 'special' = isSpecialMode && specialCase ? 'special' : 'normal';
+
+  const [answers, setAnswers] = useState<Record<string, boolean | undefined>>({});
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<AuditItem['analysis'] | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [caseCompletedMarked, setCaseCompletedMarked] = useState(false);
+  const [sessionMarked, setSessionMarked] = useState(false);
 
   useEffect(() => {
-    if (!caseData) {
+    if (mode === 'normal' && !normalCase) {
       Taro.showToast({ title: '病例不存在', icon: 'error' });
       setTimeout(() => Taro.navigateBack(), 1500);
     }
-  }, [caseData]);
+    if (mode === 'special' && !specialCase) {
+      Taro.showToast({ title: '专项练习已失效', icon: 'none' });
+      setTimeout(() => Taro.redirectTo({ url: '/pages/review/index' }), 1500);
+    }
+  }, [mode, normalCase, specialCase]);
+
+  const currentItems = useMemo<Array<{
+    key: string
+    auditItem: AuditItem
+    sourceCaseId: string
+    sourceCaseTitle: string
+    patientAge: string
+    patientGender: string
+    chiefComplaintRaw: string
+    examinationRaw: string
+    treatmentPlanRaw: string
+    imagingNote: string
+    consentNote: string
+  }>>(() => {
+    if (mode === 'normal' && normalCase) {
+      return normalCase.auditItems.map(it => ({
+        key: it.key,
+        auditItem: it,
+        sourceCaseId: normalCase.id,
+        sourceCaseTitle: normalCase.title,
+        patientAge: normalCase.patientAge,
+        patientGender: normalCase.patientGender,
+        chiefComplaintRaw: normalCase.chiefComplaintRaw,
+        examinationRaw: normalCase.examinationRaw,
+        treatmentPlanRaw: normalCase.treatmentPlanRaw,
+        imagingNote: normalCase.imagingNote,
+        consentNote: normalCase.consentNote
+      }));
+    }
+    if (mode === 'special' && specialCase) {
+      return specialCase.items.map(it => ({
+        key: `${it.caseId}-${it.auditItemKey}-${it.idx}`,
+        auditItem: it.auditItem,
+        sourceCaseId: it.caseId,
+        sourceCaseTitle: it.caseTitle,
+        patientAge: it.patientAge,
+        patientGender: it.patientGender,
+        chiefComplaintRaw: it.chiefComplaintRaw,
+        examinationRaw: it.examinationRaw,
+        treatmentPlanRaw: it.treatmentPlanRaw,
+        imagingNote: it.imagingNote,
+        consentNote: it.consentNote
+      }));
+    }
+    return [];
+  }, [mode, normalCase, specialCase]);
 
   const answeredCount = Object.values(answers).filter(a => a !== undefined).length;
-  const totalItems = caseData?.auditItems.length || 5;
-  const allAnswered = answeredCount === totalItems;
+  const totalItems = currentItems.length;
+  const allAnswered = answeredCount === totalItems && totalItems > 0;
 
   const correctCount = useMemo(() => {
-    if (!caseData) return 0;
-    return caseData.auditItems.filter(item => answers[item.key] === item.isCompliant).length;
-  }, [answers, caseData]);
+    return currentItems.filter(it => answers[it.key] === it.auditItem.isCompliant).length;
+  }, [answers, currentItems]);
 
   const wrongCount = totalItems - correctCount;
   const score = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
 
-  const handleAnswer = (item: AuditItem, userAnswer: boolean) => {
-    const isCorrect = userAnswer === item.isCompliant;
+  const handleAnswer = (itemKey: string, sourceItem: ReturnType<typeof currentItems['find']>, userAnswer: boolean) => {
+    if (!sourceItem) return;
+    const audit = sourceItem.auditItem;
+    const isCorrect = userAnswer === audit.isCompliant;
 
     setAnswers(prev => {
-      if (prev[item.key] !== undefined) return prev;
-      return { ...prev, [item.key]: userAnswer };
+      if (prev[itemKey] !== undefined) return prev;
+      return { ...prev, [itemKey]: userAnswer };
     });
 
     if (!isCorrect) {
       const existingRecord = wrongRecords.find(
-        r => r.caseId === caseData!.id && r.auditItemKey === item.key
+        r => r.caseId === sourceItem.sourceCaseId && r.auditItemKey === audit.key
       );
-
       if (!existingRecord) {
         addWrongRecord({
-          id: `${caseData!.id}-${item.key}-${Date.now()}`,
-          caseId: caseData!.id,
-          caseTitle: caseData!.title,
-          category: caseData!.category,
-          auditItemKey: item.key,
-          auditItemLabel: item.label,
+          id: `${sourceItem.sourceCaseId}-${audit.key}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          caseId: sourceItem.sourceCaseId,
+          caseTitle: sourceItem.sourceCaseTitle,
+          category: mockCases.find(c => c.id === sourceItem.sourceCaseId)!.category,
+          auditItemKey: audit.key,
+          auditItemLabel: audit.label,
           userAnswer,
-          correctAnswer: item.isCompliant,
-          weaknessCategory: item.weaknessCategory,
-          analysis: item.analysis,
+          correctAnswer: audit.isCompliant,
+          weaknessCategory: audit.weaknessCategory,
+          analysis: audit.analysis,
           timestamp: Date.now()
         });
       }
 
       setTimeout(() => {
-        setCurrentAnalysis(item.analysis);
+        setCurrentAnalysis(audit.analysis);
         setShowAnalysis(true);
       }, 200);
     }
@@ -92,46 +215,91 @@ const QuizPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    if (!allAnswered || !caseData) return;
+    if (!allAnswered) return;
 
-    if (!caseCompletedMarked) {
-      setCaseCompleted(caseData.id);
+    if (mode === 'normal' && normalCase && !caseCompletedMarked) {
+      setCaseCompleted(normalCase.id, {
+        caseId: normalCase.id,
+        caseTitle: normalCase.title,
+        category: normalCase.category,
+        correctCount,
+        wrongCount,
+        score,
+        isSpecial: false
+      });
       setCaseCompletedMarked(true);
     }
+
+    if (mode === 'special' && specialCase && !sessionMarked) {
+      setCaseCompleted(`special-${specialCase.virtualCaseId}`, {
+        caseId: specialCase.virtualCaseId,
+        caseTitle: specialCase.title,
+        category: specialCase.category,
+        correctCount,
+        wrongCount,
+        score,
+        isSpecial: true,
+        specialFilters: {
+          caseCategory: specialPractice!.filterCaseCategory,
+          weakness: specialPractice!.filterWeakness
+        }
+      });
+      setSessionMarked(true);
+    }
+
     setShowResult(true);
   };
 
   const handleGoReview = () => {
     setShowResult(false);
+    if (mode === 'special') {
+      clearSpecialPractice();
+    }
     Taro.redirectTo({ url: '/pages/review/index' });
   };
 
   const handleBackHome = () => {
     setShowResult(false);
-    Taro.navigateBack();
+    if (mode === 'special') {
+      clearSpecialPractice();
+    }
+    if (mode === 'normal') {
+      Taro.navigateBack();
+    } else {
+      Taro.redirectTo({ url: '/pages/review/index' });
+    }
   };
 
   const handleRetry = () => {
     setShowResult(false);
-    setAnswers({
-      chiefComplaint: undefined,
-      examination: undefined,
-      treatmentPlan: undefined,
-      imaging: undefined,
-      informedConsent: undefined
-    });
+    setAnswers({});
     setCaseCompletedMarked(false);
+    setSessionMarked(false);
   };
 
-  if (!caseData) return null;
+  if ((mode === 'normal' && !normalCase) || (mode === 'special' && !specialCase)) {
+    return null;
+  }
 
-  const materialItems = [
-    { label: '主诉记录', icon: '📋', content: caseData.chiefComplaintRaw },
-    { label: '检查描述', icon: '🔍', content: caseData.examinationRaw },
-    { label: '治疗计划', icon: '📝', content: caseData.treatmentPlanRaw },
-    { label: '影像留存', icon: '🖼️', content: caseData.imagingNote },
-    { label: '知情同意', icon: '✍️', content: caseData.consentNote }
-  ];
+  const materialItems = (() => {
+    const first = currentItems[0];
+    if (!first) return [];
+    return [
+      { label: '主诉记录', icon: '📋', content: first.chiefComplaintRaw },
+      { label: '检查描述', icon: '🔍', content: first.examinationRaw },
+      { label: '治疗计划', icon: '📝', content: first.treatmentPlanRaw },
+      { label: '影像留存', icon: '🖼️', content: first.imagingNote },
+      { label: '知情同意', icon: '✍️', content: first.consentNote }
+    ];
+  })();
+
+  const headerTitle = mode === 'normal'
+    ? normalCase!.title
+    : specialCase!.title;
+  const headerCategory = mode === 'normal' ? normalCase!.category : specialCase!.category;
+  const headerPatient = mode === 'normal'
+    ? { gender: normalCase!.patientGender, age: normalCase!.patientAge }
+    : { gender: '专项练习', age: `${totalItems}题` };
 
   return (
     <View className={styles.page}>
@@ -142,6 +310,17 @@ const QuizPage: React.FC = () => {
           color="primary"
           size="md"
         />
+        {mode === 'special' && (
+          <View style={{
+            padding: '12rpx 32rpx',
+            background: 'linear-gradient(90deg, #FEF3C7, #FDE68A)',
+            fontSize: '24rpx',
+            color: '#92400E',
+            fontWeight: 600
+          }}>
+            🎯 专项再练：{specialCase!.filterLabel}，共 {totalItems} 道薄弱题
+          </View>
+        )}
       </View>
 
       <ScrollView scrollY style={{ height: '100vh' }}>
@@ -149,60 +328,76 @@ const QuizPage: React.FC = () => {
           <View className={styles.caseHeader}>
             <View className={styles.caseHeaderTop}>
               <View className={styles.caseTitle}>
-                <Text className={styles.caseTitleText}>{caseData.title}</Text>
-                <CategoryTag type="case" value={caseData.category} size="sm" />
+                <Text className={styles.caseTitleText}>{headerTitle}</Text>
+                <CategoryTag type="case" value={headerCategory} size="sm" />
               </View>
             </View>
             <View className={styles.patientInfo}>
               <View className={styles.patientTag}>
-                <Text className={styles.patientTagText}>👤 {caseData.patientGender}</Text>
+                <Text className={styles.patientTagText}>👤 {headerPatient.gender}</Text>
               </View>
               <View className={styles.patientTag}>
-                <Text className={styles.patientTagText}>🎂 {caseData.patientAge}</Text>
+                <Text className={styles.patientTagText}>🎂 {headerPatient.age}</Text>
               </View>
             </View>
           </View>
 
-          <View className={styles.materialSection}>
-            <View className={styles.sectionTitle}>
-              <Text className={styles.sectionIcon}>📂</Text>
-              <Text className={styles.sectionTitleText}>病例材料</Text>
-            </View>
-            <View className={styles.materialGrid}>
-              {materialItems.map(item => (
-                <View key={item.label} className={styles.materialItem}>
-                  <View className={styles.materialLabelBox}>
-                    <Text className={styles.materialLabel}>{item.icon} {item.label}</Text>
+          {mode === 'normal' && (
+            <View className={styles.materialSection}>
+              <View className={styles.sectionTitle}>
+                <Text className={styles.sectionIcon}>📂</Text>
+                <Text className={styles.sectionTitleText}>病例材料</Text>
+              </View>
+              <View className={styles.materialGrid}>
+                {materialItems.map(item => (
+                  <View key={item.label} className={styles.materialItem}>
+                    <View className={styles.materialLabelBox}>
+                      <Text className={styles.materialLabel}>{item.icon} {item.label}</Text>
+                    </View>
+                    <View className={styles.materialContent}>
+                      <Text className={styles.materialText}>{item.content}</Text>
+                    </View>
                   </View>
-                  <View className={styles.materialContent}>
-                    <Text className={styles.materialText}>{item.content}</Text>
-                  </View>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           <View className={styles.auditSection}>
             <View className={styles.auditSectionTitle}>
               <View className={styles.auditSectionIcon}>⚖️</View>
-              <Text className={styles.auditSectionText}>质控稽核判断</Text>
+              <Text className={styles.auditSectionText}>
+                {mode === 'normal' ? '质控稽核判断' : `专项再练判断（共 ${totalItems} 题）`}
+              </Text>
             </View>
             <View className={styles.auditHint}>
-              <Text>💡 请逐项判断是否符合门诊规范。答错将自动弹出风险解析，答对可手动查看。</Text>
+              <Text>
+                {mode === 'normal'
+                  ? '💡 请逐项判断是否符合门诊规范。答错将自动弹出风险解析，答对可手动查看。'
+                  : '💡 专项再练：请仔细判断每一题，答错将自动弹出解析，巩固薄弱点。'}
+              </Text>
             </View>
 
-            {caseData.auditItems.map((item, idx) => {
-              const isAnswered = answers[item.key] !== undefined;
-              const userAnswer = answers[item.key];
+            {currentItems.map((it, idx) => {
+              const item = it.auditItem;
+              const isAnswered = answers[it.key] !== undefined;
+              const userAnswer = answers[it.key];
               const isCorrectThis = userAnswer === item.isCompliant;
 
               return (
-                <View key={item.key}>
+                <View key={it.key}>
+                  {mode === 'special' && (
+                    <View className={styles.specialCaseTag}>
+                      <Text className={styles.specialCaseTagText}>
+                        来源：{it.sourceCaseTitle}（{caseCategoryLabels[mockCases.find(c => c.id === it.sourceCaseId)!.category]}）
+                      </Text>
+                    </View>
+                  )}
                   <QuestionCard
                     auditItem={item}
                     userAnswer={userAnswer}
                     isAnswered={isAnswered}
-                    onAnswer={(ans) => handleAnswer(item, ans)}
+                    onAnswer={(ans) => handleAnswer(it.key, it, ans)}
                     index={idx + 1}
                   />
                   {isAnswered && isCorrectThis && (
@@ -259,7 +454,9 @@ const QuizPage: React.FC = () => {
               <Text>{score >= 80 ? '🎉' : '💪'}</Text>
             </View>
             <Text className={styles.resultTitle}>
-              {score >= 80 ? '稽核通过！' : score >= 60 ? '继续加油！' : '需要加强练习'}
+              {mode === 'special'
+                ? (score >= 80 ? '专项再练完成！' : '专项再练继续努力！')
+                : (score >= 80 ? '稽核通过！' : score >= 60 ? '继续加油！' : '需要加强练习')}
             </Text>
             <Text className={styles.resultSubtitle}>
               {score >= 80
@@ -281,20 +478,27 @@ const QuizPage: React.FC = () => {
               </View>
             </View>
             <View className={styles.resultBtns}>
-              {wrongCount > 0 && (
-                <View className={classnames(styles.resultBtn, styles.resultBtnPrimary)} onClick={handleGoReview}>
-                  <Text className={styles.resultBtnTextPrimary}>📖 去错题复盘</Text>
+              <View className={classnames(styles.resultBtn, styles.resultBtnPrimary)} onClick={handleGoReview}>
+                <Text className={styles.resultBtnTextPrimary}>📖 回到复盘</Text>
+              </View>
+              {mode === 'special' && wrongCount > 0 && (
+                <View className={classnames(styles.resultBtn, styles.resultBtnSecondary)} onClick={handleRetry}>
+                  <Text className={styles.resultBtnTextSecondary}>� 再练一遍</Text>
                 </View>
               )}
-              <View className={classnames(styles.resultBtn, styles.resultBtnSecondary)} onClick={handleRetry}>
-                <Text className={styles.resultBtnTextSecondary}>🔄 再练一次</Text>
-              </View>
+              {mode === 'normal' && wrongCount > 0 && (
+                <View className={classnames(styles.resultBtn, styles.resultBtnSecondary)} onClick={handleRetry}>
+                  <Text className={styles.resultBtnTextSecondary}>🔄 再练一次</Text>
+                </View>
+              )}
               <View
                 className={classnames(styles.resultBtn, styles.resultBtnSecondary)}
                 onClick={handleBackHome}
                 style={{ background: '#F1F5F9' }}
               >
-                <Text className={styles.resultBtnTextSecondary} style={{ color: '#64748B' }}>返回首页</Text>
+                <Text className={styles.resultBtnTextSecondary} style={{ color: '#64748B' }}>
+                  {mode === 'special' ? '返回复盘' : '返回首页'}
+                </Text>
               </View>
             </View>
           </View>

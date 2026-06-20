@@ -57,6 +57,7 @@ export interface TrainingStats {
 }
 
 export type FollowUpStatus = 'pending' | 'scheduled' | 'done'
+export type ClinicScene = 'comprehensive' | 'implant' | 'orthodontic' | 'endodontic' | 'pediatric' | 'surgery'
 
 export interface FollowUpTask {
   id: string
@@ -65,5 +66,36 @@ export interface FollowUpTask {
   status: FollowUpStatus
   createdAt: number
   updatedAt: number
+  scheduledDate?: string
+  clinicScene?: ClinicScene
   note?: string
+}
+
+export interface CaseSessionRecord {
+  id: string
+  caseId: string
+  caseTitle: string
+  category: CaseCategory
+  completedAt: number
+  correctCount: number
+  wrongCount: number
+  score: number
+  isSpecial?: boolean
+  specialFilters?: {
+    caseCategory?: CaseCategory | 'all'
+    weakness?: WeaknessCategory | 'all'
+  }
+}
+
+export interface SpecialPracticeConfig {
+  filterCaseCategory: CaseCategory | 'all'
+  filterWeakness: WeaknessCategory | 'all'
+  sourceWrongRecordIds: string[]
+  auditItems: Array<{
+    caseId: string
+    caseTitle: string
+    caseCategory: CaseCategory
+    auditItemKey: AuditItemKey
+    auditItem: AuditItem
+  }>
 }

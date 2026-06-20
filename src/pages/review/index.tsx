@@ -1,10 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Input } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import styles from './index.module.scss';
 import { useTraining } from '@/store/TrainingContext';
-import { WeaknessCategory, AuditItem, CaseCategory, FollowUpStatus } from '@/types';
-import { weaknessCategoryLabels, weaknessCategoryIcons, caseCategoryLabels, caseCategoryIcons } from '@/data/cases';
+import {
+  WeaknessCategory,
+  AuditItem,
+  CaseCategory,
+  FollowUpStatus,
+  ClinicScene,
+  FollowUpTask
+} from '@/types';
+import {
+  weaknessCategoryLabels,
+  weaknessCategoryIcons,
+  caseCategoryLabels,
+  caseCategoryIcons,
+  clinicSceneLabels
+} from '@/data/cases';
 import StatsCard from '@/components/StatsCard';
 import WrongItemCard from '@/components/WrongItemCard';
 import AnalysisPanel from '@/components/AnalysisPanel';
@@ -33,18 +46,36 @@ const categoryOrder: WeaknessCategory[] = [
 ];
 
 const caseCategoryOrder: CaseCategory[] = ['implant', 'orthodontic', 'endodontic'];
+const clinicSceneOrder: ClinicScene[] = [
+  'comprehensive', 'implant', 'orthodontic', 'endodontic', 'pediatric', 'surgery'
+];
 
 const adviceMap: Record<WeaknessCategory, string> = {
-  medicalRecord: `薄弱项集中在「病历书写」，建议线下跟诊时重点观察带教老师如何规范记录主诉、检查、治疗计划。主诉要涵盖"部位+症状+时间+诉求"四要素，检查描述需具体到数据（如探诊深度、松动度等），治疗计划务必列出备选方案。`,
-  infectionControl: `薄弱项集中在「感染控制」，重点关注影像留存规范性和橡皮障使用。切记：种植术前CBCT是强制要求，根管治疗三张片（术前/试尖/术后）是质控标配，橡皮障是根管院感控制的"底线"。`,
-  feeConsistency: `薄弱项集中在「收费一致性」，需注意诊断、主诉与收费项目的逻辑一致性。治疗计划中每一项收费都要有对应的适应症说明，高值项目（种植、正畸、全冠）必须单独告知并签字确认。`,
-  followUpManagement: `薄弱项集中在「复诊管理」，需加强知情同意的细节把控。专项治疗（种植、正畸、根管）必须签署对应专项知情同意书，青少年治疗需监护人签字，佩戴时长、复诊频率等约束性要求必须书面化。`
+  medicalRecord: `薄弱项集中在「病历书写」，建议线下跟诊时重点观察带教老师如何规范记录主诉、检查、治疗计划。`,
+  infectionControl: `薄弱项集中在「感染控制」，重点关注影像留存规范性和橡皮障使用。`,
+  feeConsistency: `薄弱项集中在「收费一致性」，需注意诊断、主诉与收费项目的逻辑一致性。`,
+  followUpManagement: `薄弱项集中在「复诊管理」，需加强知情同意的细节把控。`
 };
 
 const statusLabelMap: Record<FollowUpStatus, string> = {
   pending: '待安排',
   scheduled: '已安排',
   done: '已完成'
+};
+
+const getNextDates = (n: number) => {
+  const arr: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < n; i += 1) {
+    const d = new Date(now.getTime() + i * 86400000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const value = `${y}-${m}-${day}`;
+    const label = i === 0 ? '今天' : i === 1 ? '明天' : `${m}/${day}`;
+    arr.push({ value, label });
+  }
+  return arr;
 };
 
 const ReviewPage: React.FC = () => {
@@ -63,9 +94,12 @@ const ReviewPage: React.FC = () => {
     getTopWeaknessByStudent,
     getFollowUpTasksByStudent,
     updateFollowUpStatus,
+    updateFollowUpDetails,
     removeFollowUpTask,
     generateFollowUpTasksForStudent,
-    addFollowUpTask
+    addFollowUpTask,
+    getTrendByStudent,
+    generateSpecialPractice
   } = useTraining();
 
   const [activeTab, setActiveTab] = useState<WeaknessCategory | 'all'>('all');
@@ -73,6 +107,13 @@ const ReviewPage: React.FC = () => {
   const [currentAnalysis, setCurrentAnalysis] = useState<AuditItem['analysis'] | null>(null);
   const [filterCaseCategory, setFilterCaseCategory] = useState<CaseCategory | 'all'>('all');
   const [filterWeakness, setFilterWeakness] = useState<WeaknessCategory | 'all'>('all');
+  const [showTrend, setShowTrend] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingDate, setEditingDate] = useState('');
+  const [editingScene, setEditingScene] = useState<ClinicScene | ''>('');
+  const [editingNote, setEditingNote] = useState('');
+  const [followUpFilter, setFollowUpFilter] = useState<'all' | 'pending' | 'scheduled' | 'done' | 'date'>('all');
+  const [followUpFilterDate, setFollowUpFilterDate] = useState('');
 
   const selfStats = useMemo(() => getStats(), [getStats, wrongRecords.length]);
   const selfWrong = wrongRecords;
@@ -87,15 +128,13 @@ const ReviewPage: React.FC = () => {
     return getWrongRecordsByStudent(currentStudentId);
   }, [isTeacherMode, currentStudentId, selfWrong, getWrongRecordsByStudent]);
 
-  const filteredByUser = useMemo(() => effectiveWrongRecords, [effectiveWrongRecords]);
-
   const studentViewFilteredRecords = useMemo(() => {
-    return filteredByUser.filter(r => {
+    return effectiveWrongRecords.filter(r => {
       if (filterCaseCategory !== 'all' && r.category !== filterCaseCategory) return false;
       if (filterWeakness !== 'all' && r.weaknessCategory !== filterWeakness) return false;
       return true;
     });
-  }, [filteredByUser, filterCaseCategory, filterWeakness]);
+  }, [effectiveWrongRecords, filterCaseCategory, filterWeakness]);
 
   const studentViewStats = useMemo(() => {
     const dist = calcWeaknessDistribution(studentViewFilteredRecords);
@@ -111,18 +150,17 @@ const ReviewPage: React.FC = () => {
   }, [studentViewFilteredRecords, effectiveStats]);
 
   const showFilter = !isTeacherMode;
-  const displayRecords = showFilter ? studentViewFilteredRecords : filteredByUser.filter(r => activeTab === 'all' ? true : r.weaknessCategory === activeTab);
+  const filteredByTeacherTab = useMemo(
+    () =>
+      activeTab === 'all'
+        ? effectiveWrongRecords
+        : effectiveWrongRecords.filter(r => r.weaknessCategory === activeTab),
+    [effectiveWrongRecords, activeTab]
+  );
+  const displayRecords = showFilter ? studentViewFilteredRecords : filteredByTeacherTab;
   const displayStats = showFilter ? studentViewStats : effectiveStats;
   const totalWrong = displayRecords.length;
   const maxWrongCount = Math.max(1, ...Object.values(displayStats.weaknessDistribution));
-
-  const filteredRecords = useMemo(() => {
-    if (isTeacherMode) {
-      if (activeTab === 'all') return filteredByUser;
-      return filteredByUser.filter(r => r.weaknessCategory === activeTab);
-    }
-    return displayRecords;
-  }, [isTeacherMode, activeTab, filteredByUser, displayRecords]);
 
   const handleViewAnalysis = (analysis: AuditItem['analysis']) => {
     setCurrentAnalysis(analysis);
@@ -139,7 +177,6 @@ const ReviewPage: React.FC = () => {
       .map(k => ({ key: k, count: dist[k] }))
       .filter(x => x.count > 0)
       .sort((a, b) => b.count - a.count);
-
     if (sorted.length === 0) return '';
     return adviceMap[sorted[0].key];
   };
@@ -170,9 +207,15 @@ const ReviewPage: React.FC = () => {
   }, [mockStudents]);
 
   const followUpList = getFollowUpCategories(effectiveStats);
-  const effectiveStudentTasks = getFollowUpTasksByStudent(
-    isTeacherMode ? currentStudentId : 'self'
-  );
+  const rawTasks = getFollowUpTasksByStudent(isTeacherMode ? currentStudentId : 'self');
+
+  const effectiveStudentTasks = useMemo(() => {
+    if (followUpFilter === 'all') return rawTasks;
+    if (followUpFilter === 'date' && followUpFilterDate) {
+      return rawTasks.filter(t => t.scheduledDate === followUpFilterDate);
+    }
+    return rawTasks.filter(t => t.status === followUpFilter);
+  }, [rawTasks, followUpFilter, followUpFilterDate]);
 
   const classSummary = useMemo(() => {
     let totalCases = 0;
@@ -188,6 +231,13 @@ const ReviewPage: React.FC = () => {
     return { totalCases, totalWrongs, needFollowUp, totalStudents: allStudentsWithSelf.length };
   }, [allStudentsWithSelf, selfStats, getStatsByStudent, getTopWeaknessByStudent]);
 
+  const trendData = useMemo(() => {
+    return allStudentsWithSelf.map(s => ({
+      ...s,
+      trend: getTrendByStudent(s.id, 5)
+    }));
+  }, [allStudentsWithSelf, getTrendByStudent]);
+
   const resetFilters = () => {
     setFilterCaseCategory('all');
     setFilterWeakness('all');
@@ -198,13 +248,58 @@ const ReviewPage: React.FC = () => {
   const handleAddManualTask = (category: WeaknessCategory) => {
     const stuId = isTeacherMode ? currentStudentId : 'self';
     if (!stuId) return;
-    addFollowUpTask({
-      studentId: stuId,
-      category,
-      status: 'pending'
-    });
+    addFollowUpTask({ studentId: stuId, category, status: 'pending' });
     Taro.showToast({ title: '已添加任务', icon: 'success' });
   };
+
+  const handleStartSpecialPractice = () => {
+    const n = generateSpecialPractice({
+      caseCategory: filterCaseCategory,
+      weakness: filterWeakness
+    });
+    if (n > 0) {
+      Taro.redirectTo({ url: '/pages/quiz/index' });
+    }
+  };
+
+  const startEditTask = (task: FollowUpTask) => {
+    setEditingTaskId(task.id);
+    setEditingDate(task.scheduledDate || '');
+    setEditingScene(task.clinicScene || '');
+    setEditingNote(task.note || '');
+  };
+
+  const saveTaskEdit = () => {
+    if (!editingTaskId) return;
+    updateFollowUpDetails(editingTaskId, {
+      scheduledDate: editingDate || undefined,
+      clinicScene: editingScene || undefined,
+      note: editingNote || undefined
+    });
+    if (editingDate && !editingScene) {
+      updateFollowUpStatus(editingTaskId, 'scheduled');
+    }
+    setEditingTaskId(null);
+    setEditingDate('');
+    setEditingScene('');
+    setEditingNote('');
+    Taro.showToast({ title: '已保存', icon: 'success' });
+  };
+
+  const cancelEditTask = () => {
+    setEditingTaskId(null);
+    setEditingDate('');
+    setEditingScene('');
+    setEditingNote('');
+  };
+
+  const nextDates = useMemo(() => getNextDates(7), []);
+
+  const maxTrendRate = useMemo(() => {
+    let mx = 1;
+    trendData.forEach(s => s.trend.forEach(t => { mx = Math.max(mx, t.correctRate); }));
+    return mx;
+  }, [trendData]);
 
   return (
     <ScrollView scrollY className={styles.page} style={{ height: '100vh' }}>
@@ -279,6 +374,71 @@ const ReviewPage: React.FC = () => {
                   </View>
                 </View>
 
+                <View className={styles.classTrendToggle}>
+                  <View className={styles.classTrendToggleLeft}>
+                    <Text className={styles.classTrendToggleIcon}>📈</Text>
+                    <Text className={styles.classTrendToggleText}>
+                      学习趋势：最近 5 次闯关正确率变化
+                    </Text>
+                  </View>
+                  <View
+                    className={styles.classTrendToggleBtn}
+                    onClick={() => setShowTrend(v => !v)}
+                  >
+                    <Text>{showTrend ? '收起趋势' : '展开趋势'}</Text>
+                  </View>
+                </View>
+
+                {showTrend && (
+                  <View className={styles.trendPanel}>
+                    <View className={styles.trendPanelHeader}>
+                      <Text className={styles.trendPanelTitle}>📈 班级学习趋势</Text>
+                    </View>
+                    <View className={styles.trendStudentGrid}>
+                      {trendData.map(s => (
+                        <View key={s.id} className={styles.trendStudentCard}>
+                          <View className={styles.trendStudentHead}>
+                            <View className={styles.trendStudentAvatar}>{s.avatar}</View>
+                            <View>
+                              <Text className={styles.trendStudentName}>{s.name}</Text>
+                              <Text className={styles.trendStudentSubTitle}>
+                                {s.trend.length === 0 ? '暂无闯关记录' : '最近 5 次正确率变化'}
+                              </Text>
+                            </View>
+                          </View>
+                          {s.trend.length > 0 ? (
+                            <View className={styles.trendTimeline}>
+                              {s.trend.map(t => (
+                                <View key={t.idx} className={styles.trendTimelineItem}>
+                                  <Text className={styles.trendTimelineDelta}>
+                                    {t.idx > 1
+                                      ? (t.delta === 'up' ? '📈' : t.delta === 'down' ? '📉' : '➖')
+                                      : ''}
+                                  </Text>
+                                  <View
+                                    className={classnames(
+                                      styles.trendTimelineBar,
+                                      t.idx > 1 && t.delta === 'down' && styles.trendTimelineBarDown,
+                                      t.idx > 1 && t.delta === 'flat' && styles.trendTimelineBarFlat
+                                    )}
+                                    style={{ height: `${Math.max(8, (t.correctRate / maxTrendRate) * 120)}rpx` }}
+                                  />
+                                  <Text className={styles.trendTimelineValue}>{t.correctRate}%</Text>
+                                  <Text className={styles.trendTimelineLabel}>{t.label}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          ) : (
+                            <View className={styles.trendTimelineEmpty}>
+                              <Text>暂无闯关记录，完成病例后会展示学习趋势</Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
                 <View className={styles.classOverviewGrid}>
                   {allStudentsWithSelf.map(s => {
                     const st = s.id === 'self' ? selfStats : getStatsByStudent(s.id);
@@ -317,11 +477,11 @@ const ReviewPage: React.FC = () => {
                           </View>
                         </View>
 
-                        {needFU && topWeak && (
-                          <View className={styles.classStudentTopWeak}>
-                            <Text className={styles.classStudentWeakIcon}>{weaknessCategoryIcons[topWeak]}</Text>
-                            <Text className={styles.classStudentWeakLabel}>最突出薄弱项</Text>
-                            <Text className={styles.classStudentWeakValue}>{weaknessCategoryLabels[topWeak]}</Text>
+                        {topWeak && (
+                          <View className={styles.topWeaknessBox}>
+                            <Text className={styles.topWeaknessIcon}>{weaknessCategoryIcons[topWeak]}</Text>
+                            <Text className={styles.topWeaknessLabel}>最突出薄弱项</Text>
+                            <Text className={styles.topWeaknessValue}>{weaknessCategoryLabels[topWeak]}</Text>
                           </View>
                         )}
 
@@ -464,12 +624,38 @@ const ReviewPage: React.FC = () => {
 
                 {isFilterActive && (
                   <View className={styles.filterAppliedBar}>
-                    <Text className={styles.filterAppliedBarText}>
-                      当前筛选条件已生效
+                    <Text className={styles.filterAppliedBarText}>当前筛选条件已生效</Text>
+                    <Text className={styles.filterAppliedBarCount}>{displayRecords.length} 条记录</Text>
+                  </View>
+                )}
+
+                {isFilterActive && displayRecords.length > 0 && (
+                  <View className={styles.specialPracticeBar}>
+                    <Text className={styles.specialPracticeBarText}>
+                      筛选后共 {displayRecords.length} 道薄弱题，可一键生成专项再练针对性巩固
                     </Text>
-                    <Text className={styles.filterAppliedBarCount}>
-                      {displayRecords.length} 条记录
+                    <View className={styles.specialPracticeBtn} onClick={handleStartSpecialPractice}>
+                      <Text>🎯 专项再练</Text>
+                    </View>
+                  </View>
+                )}
+
+                {!isFilterActive && effectiveWrongRecords.length > 0 && (
+                  <View className={styles.specialPracticeBar}>
+                    <Text className={styles.specialPracticeBarText}>
+                      选择病例类型和薄弱项后可启动专项再练，针对性巩固薄弱点
                     </Text>
+                    <View
+                      className={styles.specialPracticeBtn}
+                      onClick={() => {
+                        const n = generateSpecialPractice({ caseCategory: 'all', weakness: 'all' });
+                        if (n > 0) {
+                          Taro.redirectTo({ url: '/pages/quiz/index' });
+                        }
+                      }}
+                    >
+                      <Text>🎯 全科再练</Text>
+                    </View>
                   </View>
                 )}
               </View>
@@ -488,7 +674,7 @@ const ReviewPage: React.FC = () => {
                   <View className={styles.radarHint}>
                     <Text>
                       {isTeacherMode
-                        ? '👨‍🏫 带教老师视图：红色高亮项为重点关注方向，下方已自动生成跟诊安排建议。'
+                        ? '👨‍🏫 带教老师视图：红色高亮项为重点关注方向。'
                         : '👨‍🏫 带教老师提示：红色高亮项为重点关注方向，建议安排线下跟诊观察。'}
                     </Text>
                   </View>
@@ -546,7 +732,11 @@ const ReviewPage: React.FC = () => {
                       <Text className={styles.teacherTipTitle}>
                         <Text>🎯</Text>
                         <Text>
-                          {isTeacherMode ? '带教老师建议' : (isFilterActive ? '筛选后建议' : '自我提升建议')}
+                          {isTeacherMode
+                            ? '带教老师建议'
+                            : isFilterActive
+                            ? '筛选后建议'
+                            : '自我提升建议'}
                         </Text>
                       </Text>
                       <Text className={styles.teacherTipContent}>{getTeacherAdvice(displayStats)}</Text>
@@ -572,18 +762,6 @@ const ReviewPage: React.FC = () => {
                     </View>
                   )}
 
-                  {isTeacherMode && followUpList.length === 0 && (
-                    <View className={styles.followUpBox}>
-                      <Text className={styles.followUpTitle}>
-                        <Text>📋</Text>
-                        <Text>薄弱项对应跟诊方向</Text>
-                      </Text>
-                      <View className={styles.noFollowUp}>
-                        <Text>该学员各维度表现均衡，暂无需特殊安排跟诊</Text>
-                      </View>
-                    </View>
-                  )}
-
                   <View className={styles.followUpPanel}>
                     <View className={styles.followUpPanelHeader}>
                       <View className={styles.followUpPanelTitle}>
@@ -604,67 +782,215 @@ const ReviewPage: React.FC = () => {
                       </View>
                     </View>
 
-                    {effectiveStudentTasks.length > 0 ? (
-                      <View className={styles.followUpTaskList}>
-                        {effectiveStudentTasks.map(task => (
+                    <View className={styles.scheduleFilterGroup}>
+                      <View
+                        className={classnames(styles.scheduleFilterChip, followUpFilter === 'all' && styles.scheduleFilterChipActive)}
+                        onClick={() => setFollowUpFilter('all')}
+                      >
+                        <Text>全部</Text>
+                      </View>
+                      <View
+                        className={classnames(styles.scheduleFilterChip, followUpFilter === 'pending' && styles.scheduleFilterChipActive)}
+                        onClick={() => setFollowUpFilter('pending')}
+                      >
+                        <Text>待安排</Text>
+                      </View>
+                      <View
+                        className={classnames(styles.scheduleFilterChip, followUpFilter === 'scheduled' && styles.scheduleFilterChipActive)}
+                        onClick={() => setFollowUpFilter('scheduled')}
+                      >
+                        <Text>已安排</Text>
+                      </View>
+                      <View
+                        className={classnames(styles.scheduleFilterChip, followUpFilter === 'done' && styles.scheduleFilterChipActive)}
+                        onClick={() => setFollowUpFilter('done')}
+                      >
+                        <Text>已完成</Text>
+                      </View>
+                      <View
+                        className={classnames(styles.scheduleFilterChip, followUpFilter === 'date' && styles.scheduleFilterChipActive)}
+                        onClick={() => {
+                          const today = nextDates[0].value;
+                          setFollowUpFilterDate(today);
+                          setFollowUpFilter('date');
+                        }}
+                      >
+                        <Text>📅 按日期</Text>
+                      </View>
+                    </View>
+
+                    {followUpFilter === 'date' && (
+                      <View className={styles.sceneChips}>
+                        {nextDates.map(d => (
                           <View
-                            key={task.id}
-                            className={classnames(
-                              styles.followUpTaskItem,
-                              task.status === 'scheduled' && styles.followUpTaskItemScheduled,
-                              task.status === 'done' && styles.followUpTaskItemDone
-                            )}
+                            key={d.value}
+                            className={classnames(styles.sceneChip, followUpFilterDate === d.value && styles.sceneChipActive)}
+                            onClick={() => setFollowUpFilterDate(d.value)}
                           >
-                            <View className={styles.followUpTaskIcon}>
-                              <Text>{weaknessCategoryIcons[task.category]}</Text>
-                            </View>
-                            <View className={styles.followUpTaskContent}>
-                              <Text className={styles.followUpTaskName}>
-                                {weaknessCategoryLabels[task.category]}
-                              </Text>
-                              <Text className={styles.followUpTaskDesc}>
-                                {followUpLabels[task.category]}
-                              </Text>
-                              <Text className={styles.followUpTaskTime}>
-                                创建于 {new Date(task.createdAt).toLocaleDateString()}
-                              </Text>
-                              <View className={styles.followUpTaskStatusBar}>
-                                <View className={classnames(
-                                  styles.followUpStatusChip,
-                                  task.status === 'pending' && styles.followUpStatusChipPending,
-                                  task.status === 'scheduled' && styles.followUpStatusChipScheduled,
-                                  task.status === 'done' && styles.followUpStatusChipDone
-                                )}>
-                                  <Text>{statusLabelMap[task.status]}</Text>
-                                </View>
-                              </View>
-                            </View>
-                            <View className={styles.followUpTaskActions}>
-                              {task.status === 'pending' && (
-                                <View
-                                  className={classnames(styles.followUpActionBtn, styles.followUpActionBtnPrimary)}
-                                  onClick={() => updateFollowUpStatus(task.id, 'scheduled')}
-                                >
-                                  <Text>安排</Text>
-                                </View>
-                              )}
-                              {task.status === 'scheduled' && (
-                                <View
-                                  className={classnames(styles.followUpActionBtn, styles.followUpActionBtnSuccess)}
-                                  onClick={() => updateFollowUpStatus(task.id, 'done')}
-                                >
-                                  <Text>完成</Text>
-                                </View>
-                              )}
-                              <View
-                                className={classnames(styles.followUpActionBtn, styles.followUpActionBtnDanger)}
-                                onClick={() => removeFollowUpTask(task.id)}
-                              >
-                                <Text>删除</Text>
-                              </View>
-                            </View>
+                            <Text>{d.label}</Text>
                           </View>
                         ))}
+                      </View>
+                    )}
+
+                    {effectiveStudentTasks.length > 0 ? (
+                      <View className={styles.followUpTaskList}>
+                        {effectiveStudentTasks.map(task => {
+                          const isEditing = editingTaskId === task.id;
+                          return (
+                            <View
+                              key={task.id}
+                              className={classnames(
+                                styles.followUpTaskItem,
+                                task.status === 'scheduled' && styles.followUpTaskItemScheduled,
+                                task.status === 'done' && styles.followUpTaskItemDone
+                              )}
+                            >
+                              <View className={styles.followUpTaskIcon}>
+                                <Text>{weaknessCategoryIcons[task.category]}</Text>
+                              </View>
+                              <View className={styles.followUpTaskContent}>
+                                <Text className={styles.followUpTaskName}>
+                                  {weaknessCategoryLabels[task.category]}
+                                </Text>
+                                <Text className={styles.followUpTaskDesc}>
+                                  {followUpLabels[task.category]}
+                                </Text>
+                                {(task.scheduledDate || task.clinicScene || task.note) && !isEditing && (
+                                  <View className={styles.scheduleRow}>
+                                    {task.scheduledDate && (
+                                      <View className={classnames(styles.scheduleField, styles.scheduleFieldDate)}>
+                                        <Text>📅 {task.scheduledDate}</Text>
+                                      </View>
+                                    )}
+                                    {task.clinicScene && (
+                                      <View className={classnames(styles.scheduleField, styles.scheduleFieldScene)}>
+                                        <Text>🏥 {clinicSceneLabels[task.clinicScene]}</Text>
+                                      </View>
+                                    )}
+                                    {task.note && (
+                                      <View className={classnames(styles.scheduleField, styles.scheduleFieldNote)}>
+                                        <Text>📝 {task.note}</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+
+                                {isEditing ? (
+                                  <View>
+                                    <View className={styles.scheduleEditorRow}>
+                                      <Text className={styles.filterGroupTitle} style={{ width: '100%' }}>选择跟诊日期</Text>
+                                      <View className={styles.sceneChips}>
+                                        {nextDates.map(d => (
+                                          <View
+                                            key={d.value}
+                                            className={classnames(styles.sceneChip, editingDate === d.value && styles.sceneChipActive)}
+                                            onClick={() => setEditingDate(d.value)}
+                                          >
+                                            <Text>{d.label}</Text>
+                                          </View>
+                                        ))}
+                                      </View>
+                                    </View>
+
+                                    <View className={styles.scheduleEditorRow}>
+                                      <Text className={styles.filterGroupTitle} style={{ width: '100%' }}>选择门诊场景</Text>
+                                      <View className={styles.sceneChips}>
+                                        {clinicSceneOrder.map(sc => (
+                                          <View
+                                            key={sc}
+                                            className={classnames(styles.sceneChip, editingScene === sc && styles.sceneChipActive)}
+                                            onClick={() => setEditingScene(sc)}
+                                          >
+                                            <Text>🏥 {clinicSceneLabels[sc]}</Text>
+                                          </View>
+                                        ))}
+                                      </View>
+                                    </View>
+
+                                    <View className={styles.scheduleEditorRow}>
+                                      <Text className={styles.filterGroupTitle} style={{ width: '100%' }}>备注</Text>
+                                      <View className={styles.scheduleEditorInputWrap}>
+                                        <Input
+                                          placeholder="如：重点观察橡皮障使用"
+                                          value={editingNote}
+                                          onInput={e => setEditingNote(e.detail.value)}
+                                        />
+                                      </View>
+                                    </View>
+
+                                    <View style={{ display: 'flex', gap: 16, marginTop: 16, justifyContent: 'flex-end' }}>
+                                      <View
+                                        className={classnames(styles.followUpActionBtn)}
+                                        onClick={cancelEditTask}
+                                      >
+                                        <Text>取消</Text>
+                                      </View>
+                                      <View
+                                        className={classnames(styles.followUpActionBtn, styles.followUpActionBtnPrimary)}
+                                        onClick={saveTaskEdit}
+                                      >
+                                        <Text>保存</Text>
+                                      </View>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <>
+                                    <Text className={styles.followUpTaskTime}>
+                                      创建于 {new Date(task.createdAt).toLocaleDateString()}
+                                    </Text>
+                                    <View className={styles.followUpTaskStatusBar}>
+                                      <View className={classnames(
+                                        styles.followUpStatusChip,
+                                        task.status === 'pending' && styles.followUpStatusChipPending,
+                                        task.status === 'scheduled' && styles.followUpStatusChipScheduled,
+                                        task.status === 'done' && styles.followUpStatusChipDone
+                                      )}>
+                                        <Text>{statusLabelMap[task.status]}</Text>
+                                      </View>
+                                    </View>
+                                  </>
+                                )}
+                              </View>
+                              <View className={styles.followUpTaskActions}>
+                                {!isEditing && (
+                                  <>
+                                    {task.status === 'pending' && (
+                                      <View
+                                        className={classnames(styles.followUpActionBtn, styles.followUpActionBtnPrimary)}
+                                        onClick={() => startEditTask(task)}
+                                      >
+                                        <Text>排班</Text>
+                                      </View>
+                                    )}
+                                    {task.status === 'pending' && (
+                                      <View
+                                        className={classnames(styles.followUpActionBtn, styles.followUpActionBtnPrimary)}
+                                        onClick={() => updateFollowUpStatus(task.id, 'scheduled')}
+                                      >
+                                        <Text>安排</Text>
+                                      </View>
+                                    )}
+                                    {task.status === 'scheduled' && (
+                                      <View
+                                        className={classnames(styles.followUpActionBtn, styles.followUpActionBtnSuccess)}
+                                        onClick={() => updateFollowUpStatus(task.id, 'done')}
+                                      >
+                                        <Text>完成</Text>
+                                      </View>
+                                    )}
+                                    <View
+                                      className={classnames(styles.followUpActionBtn, styles.followUpActionBtnDanger)}
+                                      onClick={() => removeFollowUpTask(task.id)}
+                                    >
+                                      <Text>删除</Text>
+                                    </View>
+                                  </>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     ) : (
                       <View className={styles.followUpEmpty}>
@@ -694,7 +1020,7 @@ const ReviewPage: React.FC = () => {
                 <View className={styles.emptyBox} style={{ marginTop: 0, padding: '32rpx' }}>
                   <Text className={styles.emptyIcon}>🎯</Text>
                   <Text className={styles.emptyTitle}>
-                    {isTeacherMode ? (teacherViewMode === 'overview' ? '' : '该学员暂无错题') : '暂无薄弱项'}
+                    {isTeacherMode ? '该学员暂无错题' : '暂无薄弱项'}
                   </Text>
                   <Text className={styles.emptyText}>
                     {isTeacherMode
@@ -709,7 +1035,11 @@ const ReviewPage: React.FC = () => {
               <View className={styles.sectionTitle}>
                 <Text className={styles.sectionTitleIcon}>📖</Text>
                 <Text className={styles.sectionTitleText}>
-                  {isTeacherMode ? '学员错题集' : (isFilterActive ? '筛选后错题集' : '我的错题集')}
+                  {isTeacherMode
+                    ? '学员错题集'
+                    : isFilterActive
+                    ? '筛选后错题集'
+                    : '我的错题集'}
                 </Text>
               </View>
 
@@ -719,7 +1049,6 @@ const ReviewPage: React.FC = () => {
                     const count = tab.key === 'all'
                       ? totalWrong
                       : effectiveStats.weaknessDistribution[tab.key];
-
                     return (
                       <View
                         key={tab.key}
@@ -735,18 +1064,22 @@ const ReviewPage: React.FC = () => {
                 </View>
               )}
 
-              {filteredRecords.length > 0 ? (
+              {displayRecords.length > 0 ? (
                 <View className={styles.wrongList}>
                   <View className={styles.filterAll}>
                     <Text className={styles.filterAllText}>
                       {isTeacherMode
-                        ? (activeTab === 'all' ? '展示全部错题' : `仅展示「${weaknessCategoryLabels[activeTab as WeaknessCategory]}」分类`)
-                        : (isFilterActive ? '应用筛选条件展示' : '展示全部错题')}
+                        ? activeTab === 'all'
+                          ? '展示全部错题'
+                          : `仅展示「${weaknessCategoryLabels[activeTab as WeaknessCategory]}」分类`
+                        : isFilterActive
+                        ? '应用筛选条件展示'
+                        : '展示全部错题'}
                     </Text>
-                    <Text className={styles.filterAllValue}>{filteredRecords.length} 条记录</Text>
+                    <Text className={styles.filterAllValue}>{displayRecords.length} 条记录</Text>
                   </View>
 
-                  {filteredRecords.map(record => (
+                  {displayRecords.map(record => (
                     <WrongItemCard
                       key={record.id}
                       record={record}
@@ -760,12 +1093,12 @@ const ReviewPage: React.FC = () => {
                   <Text className={styles.emptyTitle}>太棒了！</Text>
                   <Text className={styles.emptyText}>
                     {isTeacherMode
-                      ? (activeTab === 'all'
-                          ? '该学员暂无比错题记录'
-                          : `「${weaknessCategoryLabels[activeTab as WeaknessCategory]}」分类暂无错题`)
-                      : (isFilterActive
-                          ? '筛选条件下暂无错题，试试调整筛选条件'
-                          : '暂无比错题记录，继续保持！完成病例稽核闯关后错题会自动收录到这里。')}
+                      ? activeTab === 'all'
+                        ? '该学员暂无比错题记录'
+                        : `「${weaknessCategoryLabels[activeTab as WeaknessCategory]}」分类暂无错题`
+                      : isFilterActive
+                      ? '筛选条件下暂无错题，试试调整筛选条件'
+                      : '暂无比错题记录，继续保持！完成病例稽核闯关后错题会自动收录到这里。'}
                   </Text>
                   {!isTeacherMode && !isFilterActive && (
                     <View className={styles.emptyBtn} onClick={handleGoHome}>

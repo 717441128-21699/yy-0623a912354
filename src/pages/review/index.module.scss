@@ -1012,3 +1012,352 @@
   display: block;
 }
 
+// ========== 趋势入口 + 趋势图 ==========
+.classTrendToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-md;
+  background: #fff;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+}
+
+.classTrendToggleLeft {
+  display: flex;
+  align-items: center;
+}
+
+.classTrendToggleIcon {
+  font-size: 36rpx;
+  margin-right: $spacing-sm;
+}
+
+.classTrendToggleText {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+}
+
+.classTrendToggleBtn {
+  padding: 12rpx 24rpx;
+  background: #8B5CF6;
+  border-radius: $radius-round;
+
+  text {
+    font-size: $font-size-sm;
+    color: #fff;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.trendPanel {
+  background: #fff;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-xl;
+}
+
+.trendPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.trendPanelTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+}
+
+.trendStudentGrid {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.trendStudentCard {
+  background: #FAFBFC;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+  border: 1rpx solid #E2E8F0;
+}
+
+.trendStudentHead {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-md;
+}
+
+.trendStudentAvatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-right: $spacing-sm;
+}
+
+.trendStudentName {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+  display: block;
+}
+
+.trendStudentSubTitle {
+  font-size: $font-size-xs;
+  color: #64748B;
+  display: block;
+}
+
+.trendTimeline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: $spacing-xs;
+  padding: $spacing-sm 0;
+  min-height: 160rpx;
+}
+
+.trendTimelineItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.trendTimelineBar {
+  width: 100%;
+  max-width: 60rpx;
+  border-radius: 10rpx 10rpx 0 0;
+  margin-bottom: 8rpx;
+  background: linear-gradient(180deg, #3B82F6, #60A5FA);
+  min-height: 8rpx;
+}
+
+.trendTimelineBarDown {
+  background: linear-gradient(180deg, #EF4444, #F87171);
+}
+
+.trendTimelineBarFlat {
+  background: linear-gradient(180deg, #94A3B8, #CBD5E1);
+}
+
+.trendTimelineLabel {
+  font-size: 20rpx;
+  color: #94A3B8;
+  margin-bottom: 4rpx;
+}
+
+.trendTimelineValue {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  color: #1E293B;
+}
+
+.trendTimelineDelta {
+  font-size: 20rpx;
+  margin-top: 2rpx;
+}
+
+.trendTimelineEmpty {
+  width: 100%;
+  padding: $spacing-lg 0;
+  text-align: center;
+  font-size: $font-size-sm;
+  color: #94A3B8;
+}
+
+// ========== 专项再练入口 ==========
+.specialPracticeBar {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md;
+  background: linear-gradient(90deg, #F0F9FF, #EFF6FF);
+  border-radius: $radius-md;
+  margin: $spacing-md 0;
+  border: 2rpx solid #BFDBFE;
+}
+
+.specialPracticeBarText {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: #1D4ED8;
+  font-weight: $font-weight-medium;
+  line-height: 1.5;
+}
+
+.specialPracticeBtn {
+  padding: 14rpx 28rpx;
+  background: #2563EB;
+  border-radius: $radius-round;
+  box-shadow: 0 4rpx 12rpx rgba(37, 99, 235, 0.3);
+
+  text {
+    font-size: $font-size-sm;
+    color: #fff;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+// ========== 排班扩展：日期/场景/备注 ==========
+.scheduleRow {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.scheduleField {
+  padding: 10rpx 18rpx;
+  background: #fff;
+  border-radius: $radius-round;
+  border: 1rpx solid #E2E8F0;
+
+  text {
+    font-size: $font-size-xs;
+    color: #475569;
+  }
+}
+
+.scheduleFieldDate {
+  background: #DBEAFE;
+
+  text {
+    color: #1E40AF;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.scheduleFieldScene {
+  background: #FEF3C7;
+
+  text {
+    color: #92400E;
+  }
+}
+
+.scheduleFieldNote {
+  flex: 1;
+  background: #F1F5F9;
+
+  text {
+    color: #475569;
+  }
+}
+
+.scheduleEditorRow {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scheduleEditorInputWrap {
+  flex: 1;
+  min-width: 200rpx;
+  background: #fff;
+  border: 2rpx solid #E2E8F0;
+  border-radius: $radius-round;
+  padding: 10rpx 20rpx;
+
+  input, textarea {
+    width: 100%;
+    font-size: $font-size-sm;
+    color: #1E293B;
+  }
+}
+
+.sceneChips {
+  display: flex;
+  gap: $spacing-xs;
+  flex-wrap: wrap;
+  margin-top: 8rpx;
+}
+
+.sceneChip {
+  padding: 8rpx 16rpx;
+  background: #F8FAFC;
+  border-radius: $radius-round;
+  border: 1rpx solid #E2E8F0;
+
+  text {
+    font-size: $font-size-xs;
+    color: #475569;
+  }
+}
+
+.sceneChipActive {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+
+  text {
+    color: #92400E;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.scheduleFilterGroup {
+  display: flex;
+  gap: $spacing-xs;
+  flex-wrap: wrap;
+  margin-bottom: $spacing-md;
+}
+
+.scheduleFilterChip {
+  padding: 12rpx 20rpx;
+  background: #F1F5F9;
+  border-radius: $radius-round;
+
+  text {
+    font-size: $font-size-sm;
+    color: #475569;
+  }
+}
+
+.scheduleFilterChipActive {
+  background: #DBEAFE;
+
+  text {
+    color: #1E40AF;
+    font-weight: $font-weight-semibold;
+  }
+}
+
+.topWeaknessBox {
+  display: flex;
+  align-items: center;
+  padding: $spacing-sm $spacing-md;
+  background: linear-gradient(90deg, #FEF3C7, #FDE68A);
+  border-radius: $radius-sm;
+  margin-top: $spacing-sm;
+}
+
+.topWeaknessIcon {
+  font-size: 28rpx;
+  margin-right: $spacing-sm;
+}
+
+.topWeaknessLabel {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: #92400E;
+  font-weight: $font-weight-medium;
+}
+
+.topWeaknessValue {
+  font-size: $font-size-sm;
+  color: #92400E;
+  font-weight: $font-weight-bold;
+}
+
+

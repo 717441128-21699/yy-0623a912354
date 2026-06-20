@@ -1,0 +1,194 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-lg;
+  border: 2rpx solid transparent;
+  transition: all $transition-base;
+}
+
+.correct {
+  border-color: $color-success;
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+}
+
+.wrong {
+  border-color: $color-error;
+  background: linear-gradient(180deg, #ffffff 0%, #fef2f2 100%);
+}
+
+.header {
+  display: flex;
+  gap: $spacing-md;
+  margin-bottom: $spacing-lg;
+}
+
+.indexBadge {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $radius-md;
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-light 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.indexText {
+  color: $color-text-white;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+}
+
+.headerContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-xs;
+}
+
+.title {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.rule {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 1.6;
+}
+
+.actionRow {
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.question {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+  margin-bottom: $spacing-lg;
+  display: block;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: $spacing-md;
+}
+
+.btn {
+  flex: 1;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.96);
+    opacity: 0.9;
+  }
+}
+
+.btnCompliant {
+  background: linear-gradient(135deg, $color-success 0%, $color-success-light 100%);
+}
+
+.btnNonCompliant {
+  background: linear-gradient(135deg, $color-error 0%, $color-error-light 100%);
+}
+
+.btnText {
+  color: $color-text-white;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+}
+
+.resultRow {
+  padding-top: $spacing-md;
+  border-top: 1rpx solid $color-divider;
+}
+
+.resultHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-md;
+}
+
+.correctTag {
+  background: $color-success-bg;
+  padding: 6rpx 20rpx;
+  border-radius: $radius-xs;
+}
+
+.correctTagText {
+  font-size: $font-size-sm;
+  color: $color-success;
+  font-weight: $font-weight-semibold;
+}
+
+.wrongTag {
+  background: $color-error-bg;
+  padding: 6rpx 20rpx;
+  border-radius: $radius-xs;
+}
+
+.wrongTagText {
+  font-size: $font-size-sm;
+  color: $color-error;
+  font-weight: $font-weight-semibold;
+}
+
+.answerRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+}
+
+.answerLabel {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.answerValue {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+}
+
+.answerYes {
+  color: $color-success;
+}
+
+.answerNo {
+  color: $color-error;
+}
+
+.defectBox {
+  background: $color-warning-bg;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+}
+
+.defectLabel {
+  font-size: $font-size-sm;
+  color: $color-warning;
+  font-weight: $font-weight-semibold;
+  margin-right: $spacing-xs;
+}
+
+.defectText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 1.6;
+}

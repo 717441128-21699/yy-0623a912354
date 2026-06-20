@@ -1,0 +1,23 @@
+@use '@/styles/variables.scss' as *;
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-sm;
+  background-color: $color-primary-bg;
+}
+
+.tagSm {
+  padding: 2rpx 12rpx;
+
+  :global(.text) {
+    font-size: $font-size-xs;
+  }
+}
+
+.text {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  line-height: 1.4;
+}

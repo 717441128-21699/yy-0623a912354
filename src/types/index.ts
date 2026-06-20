@@ -1,0 +1,57 @@
+export type CaseCategory = 'implant' | 'orthodontic' | 'endodontic'
+
+export type AuditItemKey = 'chiefComplaint' | 'examination' | 'treatmentPlan' | 'imaging' | 'informedConsent'
+
+export type WeaknessCategory = 'medicalRecord' | 'infectionControl' | 'feeConsistency' | 'followUpManagement'
+
+export interface AuditItem {
+  key: AuditItemKey
+  label: string
+  description: string
+  isCompliant: boolean
+  defectDetail?: string
+  analysis: {
+    riskType: 'dispute' | 'insurance' | 'fee'
+    title: string
+    content: string
+    scenario: string
+  }
+  weaknessCategory: WeaknessCategory
+}
+
+export interface CaseData {
+  id: string
+  title: string
+  category: CaseCategory
+  difficulty: 1 | 2 | 3
+  patientAge: string
+  patientGender: string
+  chiefComplaintRaw: string
+  examinationRaw: string
+  treatmentPlanRaw: string
+  imagingNote: string
+  consentNote: string
+  auditItems: AuditItem[]
+}
+
+export interface WrongRecord {
+  id: string
+  caseId: string
+  caseTitle: string
+  category: CaseCategory
+  auditItemKey: AuditItemKey
+  auditItemLabel: string
+  userAnswer: boolean
+  correctAnswer: boolean
+  weaknessCategory: WeaknessCategory
+  analysis: AuditItem['analysis']
+  timestamp: number
+}
+
+export interface TrainingStats {
+  totalCases: number
+  completedCases: number
+  correctRate: number
+  wrongCount: number
+  weaknessDistribution: Record<WeaknessCategory, number>
+}

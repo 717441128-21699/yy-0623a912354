@@ -1,0 +1,71 @@
+@use '@/styles/variables.scss' as *;
+
+.wrapper {
+  width: 100%;
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.labelText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}
+
+.percent {
+  font-size: $font-size-sm;
+  color: $color-primary;
+  font-weight: $font-weight-semibold;
+}
+
+.track {
+  width: 100%;
+  background-color: $color-bg-hover;
+  border-radius: $radius-round;
+  overflow: hidden;
+}
+
+.sizeSm {
+  .track {
+    height: 8rpx;
+  }
+}
+
+.sizeMd {
+  .track {
+    height: 12rpx;
+  }
+}
+
+.sizeLg {
+  .track {
+    height: 16rpx;
+  }
+}
+
+.fill {
+  height: 100%;
+  border-radius: $radius-round;
+  transition: width $transition-base ease;
+}
+
+.colorPrimary {
+  background: linear-gradient(90deg, $color-primary 0%, $color-primary-light 100%);
+}
+
+.colorSuccess {
+  background: linear-gradient(90deg, $color-success 0%, $color-success-light 100%);
+}
+
+.colorWarning {
+  background: linear-gradient(90deg, $color-warning 0%, $color-warning-light 100%);
+}
+
+.colorError {
+  background: linear-gradient(90deg, $color-error 0%, $color-error-light 100%);
+}

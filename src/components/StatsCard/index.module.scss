@@ -1,0 +1,104 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  display: flex;
+  align-items: center;
+  padding: $spacing-lg;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  transition: all $transition-base;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  margin-right: $spacing-lg;
+  flex-shrink: 0;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin-bottom: $spacing-xs;
+}
+
+.titleText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  font-weight: $font-weight-medium;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-xs;
+}
+
+.value {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  line-height: 1.2;
+}
+
+.unit {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  font-weight: $font-weight-medium;
+}
+
+.subText {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+  display: block;
+}
+
+.colorPrimary {
+  .icon {
+    background-color: $color-primary-bg;
+  }
+  .value {
+    color: $color-primary;
+  }
+}
+
+.colorSuccess {
+  .icon {
+    background-color: $color-success-bg;
+  }
+  .value {
+    color: $color-success;
+  }
+}
+
+.colorWarning {
+  .icon {
+    background-color: $color-warning-bg;
+  }
+  .value {
+    color: $color-warning;
+  }
+}
+
+.colorError {
+  .icon {
+    background-color: $color-error-bg;
+  }
+  .value {
+    color: $color-error;
+  }
+}
